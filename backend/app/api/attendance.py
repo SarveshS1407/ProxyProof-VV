@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -369,9 +370,14 @@ def get_student_percentages(
 
     for e in enrollments:
         course = e.course
-        # Total sessions conducted for this course
+        # Total sessions conducted for this course (exclude unstarted future drafts)
         sessions = db.query(AttendanceSession).filter(
-            AttendanceSession.course_id == course.id
+            AttendanceSession.course_id == course.id,
+            or_(
+                AttendanceSession.is_active == True,
+                AttendanceSession.is_closed == True,
+                AttendanceSession.start_time.isnot(None)
+            )
         ).all()
         session_ids = [s.id for s in sessions]
         total_course_sessions = len(session_ids)

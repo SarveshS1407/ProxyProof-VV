@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { getOrCreateDeviceKeys, signCanonicalPayload } from '../utils/crypto';
 import {
   Device, AttendanceSession, StudentReport, DeviceChangeRequest
 } from '../types';
@@ -79,27 +80,50 @@ export const StudentPortal: React.FC = () => {
     }
   };
 
-  // Automated / One-Tap Check-In Submission
+  // Register current device (initial registration for new students)
+  const handleRegisterCurrentDevice = async () => {
+    try {
+      setLoading(true);
+      const keyInfo = await getOrCreateDeviceKeys();
+      await api.registerDevice({
+        device_identifier: keyInfo.deviceIdentifier,
+        public_key: keyInfo.publicKeyPem,
+        device_model: keyInfo.deviceModel,
+        os_version: keyInfo.osVersion
+      });
+      alert('Your device has been successfully registered and cryptographically bound to your student account!');
+      await fetchData();
+    } catch (err: any) {
+      alert(`Device registration failed: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Automated / One-Tap Check-In Submission with WebCrypto Proof of Possession
   const handlePerformCheckIn = async () => {
     if (!selectedSession || !user) return;
     setSubmitting(true);
     setCheckInStatus('IDLE');
 
     try {
-      // 1. Fetch current token
+      const activeDev = devices.find((d) => d.status === 'APPROVED');
+      if (!activeDev) {
+        throw new Error('No approved device registered. Please register this device first.');
+      }
+
+      // 1. Fetch current rotating token
       const tokenData = await api.getCurrentToken(selectedSession.id);
       const token = tokenData.token_value;
       const nowTs = Math.floor(Date.now() / 1000);
       const nonce = `web-${Math.random().toString(36).substring(2, 15)}`;
-      const activeDev = devices.find((d) => d.status === 'APPROVED');
-      const devIdentifier = activeDev ? activeDev.device_identifier : 'pixel8-alice-demo-id';
+      const devIdentifier = activeDev.device_identifier;
 
       // 2. Cryptographic signature over canonical payload
-      // In production mobile, the hardware Keystore/Secure Enclave signs this.
-      // In the web client, we generate an Ed25519/mock challenge signature compatible with the server:
       const canonicalPayload = `${user.id}:${selectedSession.id}:${token}:${nowTs}:${nonce}:${simulatedRssi}`;
-      
-      // Submit attendance claim
+      const signatureHex = await signCanonicalPayload(canonicalPayload);
+
+      // 3. Submit attendance claim with genuine digital signature
       const res = await api.submitAttendance({
         session_id: selectedSession.id,
         token: token,
@@ -107,7 +131,7 @@ export const StudentPortal: React.FC = () => {
         timestamp: nowTs,
         nonce: nonce,
         device_identifier: devIdentifier,
-        signature: 'mock_demo_signature_or_ed25519_hex'
+        signature: signatureHex
       });
 
       setCheckInStatus('SUCCESS');
@@ -124,18 +148,23 @@ export const StudentPortal: React.FC = () => {
   const handleDeviceChangeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const newDevId = `dev-${Math.random().toString(36).substring(2, 10)}`;
-      const newPubKey = `MCowBQYDK2VwAyEA${Math.random().toString(36).substring(2, 16)}`;
+      // Clear old keys and generate fresh keypair for replacement device
+      localStorage.removeItem('proxyproof_device_priv_jwk');
+      localStorage.removeItem('proxyproof_device_pub_pem');
+      localStorage.removeItem('proxyproof_device_identifier');
+      const newKeys = await getOrCreateDeviceKeys();
+
       await api.requestDeviceChange({
-        new_device_identifier: newDevId,
-        new_public_key: newPubKey,
-        new_device_model: newDeviceModel || 'New Smartphone',
-        new_os_version: 'Android 15',
+        new_device_identifier: newKeys.deviceIdentifier,
+        new_public_key: newKeys.publicKeyPem,
+        new_device_model: newDeviceModel || newKeys.deviceModel,
+        new_os_version: newKeys.osVersion,
         reason: changeReason
       });
       alert('Device replacement request submitted! Awaiting administrator approval.');
       setShowDeviceModal(false);
       setChangeReason('');
+      setNewDeviceModel('');
       fetchData();
     } catch (e: any) {
       alert(`Error submitting request: ${e.message}`);
@@ -201,18 +230,31 @@ export const StudentPortal: React.FC = () => {
             </div>
           ) : (
             <div style={{ padding: '1rem', background: '#fef3c7', borderRadius: '0.5rem', color: '#92400e', fontSize: '0.8125rem', marginBottom: '1rem' }}>
-              No approved device registered yet. Please register your primary phone.
+              <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>No approved device bound</div>
+              You must register your primary device to authenticate attendance check-ins.
             </div>
           )}
 
-          <button
-            onClick={() => setShowDeviceModal(true)}
-            className="btn btn-secondary"
-            style={{ width: '100%', fontSize: '0.8125rem' }}
-          >
-            <span>Request Device Change / Upgrade</span>
-            <ArrowUpRight size={16} />
-          </button>
+          {approvedDevice ? (
+            <button
+              onClick={() => setShowDeviceModal(true)}
+              className="btn btn-secondary"
+              style={{ width: '100%', fontSize: '0.8125rem' }}
+            >
+              <span>Request Device Change / Upgrade</span>
+              <ArrowUpRight size={16} />
+            </button>
+          ) : (
+            <button
+              onClick={handleRegisterCurrentDevice}
+              disabled={loading}
+              className="btn btn-primary"
+              style={{ width: '100%', fontSize: '0.875rem' }}
+            >
+              <ShieldCheck size={18} />
+              <span>{loading ? 'Registering Device...' : 'Register & Verify This Device'}</span>
+            </button>
+          )}
         </div>
 
         {/* BLE Attendance Check-In Card */}
@@ -288,8 +330,8 @@ export const StudentPortal: React.FC = () => {
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#64748b' }}>Service UUID:</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>0xFD00</span>
+                      <span style={{ color: '#64748b' }}>BLE Service UUID:</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>0xFFF0</span>
                     </div>
                   </div>
 
@@ -307,12 +349,18 @@ export const StudentPortal: React.FC = () => {
 
                   <button
                     onClick={handlePerformCheckIn}
-                    disabled={submitting}
+                    disabled={submitting || !approvedDevice}
                     className="btn btn-primary"
                     style={{ width: '100%', padding: '0.75rem' }}
                   >
                     <Bluetooth size={18} />
-                    <span>{submitting ? 'Verifying Cryptographic Proof...' : 'Check In Automatically via BLE'}</span>
+                    <span>
+                      {submitting
+                        ? 'Verifying Cryptographic Proof...'
+                        : !approvedDevice
+                        ? 'Register Device to Enable Check-In'
+                        : 'Check In Automatically via BLE'}
+                    </span>
                   </button>
                 </>
               )}

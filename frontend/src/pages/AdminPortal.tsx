@@ -38,26 +38,44 @@ export const AdminPortal: React.FC = () => {
     fetchAdminData();
   }, []);
 
-  const handleReviewRequest = async (requestId: number, approved: boolean) => {
-    const notes = prompt(
-      approved
-        ? 'Enter approval remarks (optional):'
-        : 'Enter reason for rejection (required):'
-    );
-    if (!approved && !notes) return;
+  // Review Modal State
+  const [reviewTarget, setReviewTarget] = useState<{
+    requestId: number;
+    approved: boolean;
+    deviceModel?: string;
+  } | null>(null);
+  const [reviewNotes, setReviewNotes] = useState('');
 
+  // User Toggle Modal State
+  const [userToggleTarget, setUserToggleTarget] = useState<User | null>(null);
+
+  const openReviewModal = (requestId: number, approved: boolean, deviceModel?: string) => {
+    setReviewTarget({ requestId, approved, deviceModel });
+    setReviewNotes('');
+  };
+
+  const handleConfirmReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewTarget) return;
+    if (!reviewTarget.approved && !reviewNotes.trim()) {
+      alert('Please provide a reason for rejecting this request.');
+      return;
+    }
     try {
-      await api.reviewDeviceRequest(requestId, approved, notes || undefined);
+      await api.reviewDeviceRequest(reviewTarget.requestId, reviewTarget.approved, reviewNotes.trim() || undefined);
+      setReviewTarget(null);
+      setReviewNotes('');
       await fetchAdminData();
     } catch (e: any) {
       alert(`Error reviewing request: ${e.message}`);
     }
   };
 
-  const handleToggleUserStatus = async (user: User) => {
-    if (!confirm(`Are you sure you want to ${user.is_active ? 'deactivate' : 'activate'} ${user.email}?`)) return;
+  const handleConfirmToggleUser = async () => {
+    if (!userToggleTarget) return;
     try {
-      await api.updateUserStatus(user.id, !user.is_active);
+      await api.updateUserStatus(userToggleTarget.id, !userToggleTarget.is_active);
+      setUserToggleTarget(null);
       await fetchAdminData();
     } catch (e: any) {
       alert(`Error updating user: ${e.message}`);
@@ -251,7 +269,7 @@ export const AdminPortal: React.FC = () => {
                         {r.status === 'PENDING' ? (
                           <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
                             <button
-                              onClick={() => handleReviewRequest(r.id, true)}
+                              onClick={() => openReviewModal(r.id, true, r.new_device_model)}
                               className="btn btn-success"
                               style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem' }}
                             >
@@ -259,7 +277,7 @@ export const AdminPortal: React.FC = () => {
                               <span>Approve</span>
                             </button>
                             <button
-                              onClick={() => handleReviewRequest(r.id, false)}
+                              onClick={() => openReviewModal(r.id, false, r.new_device_model)}
                               className="btn btn-danger"
                               style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem' }}
                             >
@@ -317,7 +335,7 @@ export const AdminPortal: React.FC = () => {
                     </td>
                     <td style={{ padding: '0.875rem 1.5rem', textAlign: 'right' }}>
                       <button
-                        onClick={() => handleToggleUserStatus(u)}
+                        onClick={() => setUserToggleTarget(u)}
                         className={`btn ${u.is_active ? 'btn-secondary' : 'btn-primary'}`}
                         style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem' }}
                       >
@@ -368,6 +386,89 @@ export const AdminPortal: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Review Device Replacement Request */}
+      {reviewTarget && (
+        <div className="modal-backdrop">
+          <div className="modal-content">
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem' }}>
+              {reviewTarget.approved ? 'Approve Device Replacement' : 'Reject Device Replacement'}
+            </h2>
+            <p style={{ fontSize: '0.8125rem', color: '#64748b', marginBottom: '1.25rem' }}>
+              Request #{reviewTarget.requestId} • New Model: <strong>{reviewTarget.deviceModel || 'Smartphone'}</strong>
+            </p>
+
+            <form onSubmit={handleConfirmReview} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#334155', marginBottom: '0.375rem' }}>
+                  {reviewTarget.approved ? 'Approval Remarks (Optional)' : 'Rejection Reason (Required)'}
+                </label>
+                <textarea
+                  rows={3}
+                  required={!reviewTarget.approved}
+                  placeholder={reviewTarget.approved ? 'e.g. Identity verified via student services office' : 'e.g. Student ID verification failed'}
+                  value={reviewNotes}
+                  onChange={(e) => setReviewNotes(e.target.value)}
+                  className="input-field"
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setReviewTarget(null)}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={`btn ${reviewTarget.approved ? 'btn-success' : 'btn-danger'}`}
+                >
+                  {reviewTarget.approved ? 'Confirm Approval' : 'Confirm Rejection'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirm User Status Modification */}
+      {userToggleTarget && (
+        <div className="modal-backdrop">
+          <div className="modal-content">
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem' }}>
+              {userToggleTarget.is_active ? 'Suspend User Account' : 'Activate User Account'}
+            </h2>
+            <p style={{ fontSize: '0.875rem', color: '#334155', margin: '1rem 0' }}>
+              Are you sure you want to <strong>{userToggleTarget.is_active ? 'suspend' : 're-activate'}</strong> the account for{' '}
+              <strong>{userToggleTarget.full_name}</strong> ({userToggleTarget.email})?
+            </p>
+            {userToggleTarget.is_active && (
+              <div style={{ padding: '0.75rem', background: '#fef3c7', borderRadius: '0.375rem', color: '#92400e', fontSize: '0.8125rem', marginBottom: '1rem' }}>
+                Suspended users will immediately be blocked from logging in and checking into attendance sessions.
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <button
+                type="button"
+                onClick={() => setUserToggleTarget(null)}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmToggleUser}
+                className={`btn ${userToggleTarget.is_active ? 'btn-danger' : 'btn-primary'}`}
+              >
+                {userToggleTarget.is_active ? 'Yes, Suspend Account' : 'Yes, Activate Account'}
+              </button>
+            </div>
           </div>
         </div>
       )}

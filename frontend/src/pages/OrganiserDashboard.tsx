@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { api } from '../api/client';
+import { api, WS_BASE_URL } from '../api/client';
 import { Course, AttendanceSession, AttendanceRecord, SessionTokenInfo } from '../types';
 import {
   Play, Square, Download, Plus, Users, Clock, Radio, CheckCircle,
-  AlertCircle, Edit2, ShieldCheck, RefreshCw, Smartphone
+  AlertCircle, Edit2, ShieldCheck, RefreshCw, Smartphone, BookOpen, UserPlus
 } from 'lucide-react';
 
 export const OrganiserDashboard: React.FC = () => {
@@ -19,6 +19,16 @@ export const OrganiserDashboard: React.FC = () => {
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
   const [overrideStatus, setOverrideStatus] = useState<string>('EXCUSED');
   const [overrideReason, setOverrideReason] = useState<string>('');
+  
+  // Course Management Modals
+  const [showCourseModal, setShowCourseModal] = useState(false);
+  const [newCourseCode, setNewCourseCode] = useState('');
+  const [newCourseTitle, setNewCourseTitle] = useState('');
+  const [newCourseDesc, setNewCourseDesc] = useState('');
+
+  const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const [enrollCourseId, setEnrollCourseId] = useState<number>(0);
+  const [enrollStudentId, setEnrollStudentId] = useState('');
 
   // New Session Form
   const [newCourseId, setNewCourseId] = useState<number>(0);
@@ -79,7 +89,7 @@ export const OrganiserDashboard: React.FC = () => {
     if (!activeSession) return;
 
     const token = localStorage.getItem('proxyproof_token');
-    const wsUrl = `ws://localhost:8000/api/v1/ws/sessions/${activeSession.id}${token ? `?token=${token}` : ''}`;
+    const wsUrl = `${WS_BASE_URL}/ws/sessions/${activeSession.id}${token ? `?token=${token}` : ''}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -119,6 +129,46 @@ export const OrganiserDashboard: React.FC = () => {
 
     return () => clearInterval(timer);
   }, [activeSession?.id, activeSession?.is_active, activeSession?.is_closed]);
+
+  const handleCreateCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCourseCode.trim() || !newCourseTitle.trim()) return;
+    try {
+      const created = await api.createCourse({
+        code: newCourseCode.trim().toUpperCase(),
+        title: newCourseTitle.trim(),
+        description: newCourseDesc.trim() || undefined
+      });
+      setNewCourseCode('');
+      setNewCourseTitle('');
+      setNewCourseDesc('');
+      setShowCourseModal(false);
+      await fetchInitialData();
+      setNewCourseId(created.id);
+      alert(`Course "${created.code}: ${created.title}" created successfully!`);
+    } catch (err: any) {
+      alert(`Error creating course: ${err.message}`);
+    }
+  };
+
+  const handleEnrollStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetCourseId = enrollCourseId || (courses.length > 0 ? courses[0].id : 0);
+    if (!targetCourseId) {
+      alert('Please select a course to enroll students in.');
+      return;
+    }
+    if (!enrollStudentId.trim()) return;
+    try {
+      const res = await api.enrollStudent(targetCourseId, enrollStudentId.trim());
+      setEnrollStudentId('');
+      setShowEnrollModal(false);
+      await fetchInitialData();
+      alert(res.message || 'Student enrolled successfully!');
+    } catch (err: any) {
+      alert(`Error enrolling student: ${err.message}`);
+    }
+  };
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,7 +249,30 @@ export const OrganiserDashboard: React.FC = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setShowCourseModal(true)}
+            className="btn btn-secondary"
+            title="Create a new course"
+          >
+            <BookOpen size={18} />
+            <span>New Course</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (courses.length > 0 && !enrollCourseId) {
+                setEnrollCourseId(courses[0].id);
+              }
+              setShowEnrollModal(true);
+            }}
+            className="btn btn-secondary"
+            title="Enroll a student into a course"
+          >
+            <UserPlus size={18} />
+            <span>Enroll Student</span>
+          </button>
+
           <button
             onClick={() => setShowCreateModal(true)}
             className="btn btn-primary"
@@ -535,17 +608,34 @@ export const OrganiserDashboard: React.FC = () => {
                 <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#334155', marginBottom: '0.375rem' }}>
                   Course
                 </label>
-                <select
-                  value={newCourseId}
-                  onChange={(e) => setNewCourseId(Number(e.target.value))}
-                  className="input-field"
-                >
-                  {courses.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.code}: {c.title}
-                    </option>
-                  ))}
-                </select>
+                {courses.length === 0 ? (
+                  <div style={{ padding: '0.75rem', background: '#fef3c7', borderRadius: '0.375rem', color: '#92400e', fontSize: '0.8125rem' }}>
+                    No courses found. Please create a course first before starting sessions.
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCreateModal(false);
+                        setShowCourseModal(true);
+                      }}
+                      className="btn btn-secondary"
+                      style={{ marginTop: '0.5rem', width: '100%', fontSize: '0.75rem' }}
+                    >
+                      + Create Course Now
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={newCourseId}
+                    onChange={(e) => setNewCourseId(Number(e.target.value))}
+                    className="input-field"
+                  >
+                    {courses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.code}: {c.title}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div>
@@ -676,6 +766,146 @@ export const OrganiserDashboard: React.FC = () => {
                 </button>
                 <button type="submit" className="btn btn-primary">
                   Save Correction
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Create New Course */}
+      {showCourseModal && (
+        <div className="modal-backdrop">
+          <div className="modal-content">
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem' }}>
+              Create New Course
+            </h2>
+            <p style={{ fontSize: '0.8125rem', color: '#64748b', marginBottom: '1.25rem' }}>
+              Define a new academic course to host attendance sessions.
+            </p>
+
+            <form onSubmit={handleCreateCourse} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#334155', marginBottom: '0.375rem' }}>
+                  Course Code (e.g. CS401)
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="CS401"
+                  value={newCourseCode}
+                  onChange={(e) => setNewCourseCode(e.target.value)}
+                  className="input-field"
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#334155', marginBottom: '0.375rem' }}>
+                  Course Title
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Distributed Systems & Security"
+                  value={newCourseTitle}
+                  onChange={(e) => setNewCourseTitle(e.target.value)}
+                  className="input-field"
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#334155', marginBottom: '0.375rem' }}>
+                  Description (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Brief syllabus or course notes..."
+                  value={newCourseDesc}
+                  onChange={(e) => setNewCourseDesc(e.target.value)}
+                  className="input-field"
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCourseModal(false)}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Create Course
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Enroll Student into Course */}
+      {showEnrollModal && (
+        <div className="modal-backdrop">
+          <div className="modal-content">
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem' }}>
+              Enroll Student into Course
+            </h2>
+            <p style={{ fontSize: '0.8125rem', color: '#64748b', marginBottom: '1.25rem' }}>
+              Authorize a registered student to participate in sessions for this course.
+            </p>
+
+            <form onSubmit={handleEnrollStudent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#334155', marginBottom: '0.375rem' }}>
+                  Select Course
+                </label>
+                {courses.length === 0 ? (
+                  <div style={{ padding: '0.75rem', background: '#fef3c7', borderRadius: '0.375rem', color: '#92400e', fontSize: '0.8125rem' }}>
+                    No courses available. Please create a course first.
+                  </div>
+                ) : (
+                  <select
+                    value={enrollCourseId}
+                    onChange={(e) => setEnrollCourseId(Number(e.target.value))}
+                    className="input-field"
+                  >
+                    {courses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.code}: {c.title}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#334155', marginBottom: '0.375rem' }}>
+                  Student ID Number
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. STU-2024-001"
+                  value={enrollStudentId}
+                  onChange={(e) => setEnrollStudentId(e.target.value)}
+                  className="input-field"
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowEnrollModal(false)}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={courses.length === 0}
+                  className="btn btn-primary"
+                >
+                  Enroll Student
                 </button>
               </div>
             </form>

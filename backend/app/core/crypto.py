@@ -3,7 +3,7 @@ import binascii
 from typing import Tuple
 
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives.asymmetric import ed25519, ec
+from cryptography.hazmat.primitives.asymmetric import ed25519, ec, utils
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 
@@ -69,7 +69,15 @@ def verify_device_signature(public_key_str: str, message: str, signature_str: st
                 loaded_key.verify(sig_bytes, msg_bytes)
                 return True
             elif isinstance(loaded_key, ec.EllipticCurvePublicKey):
-                loaded_key.verify(sig_bytes, msg_bytes, ec.ECDSA(hashes.SHA256()))
+                test_sig = sig_bytes
+                if len(sig_bytes) == 64:
+                    try:
+                        r = int.from_bytes(sig_bytes[:32], byteorder="big")
+                        s = int.from_bytes(sig_bytes[32:], byteorder="big")
+                        test_sig = utils.encode_dss_signature(r, s)
+                    except Exception:
+                        test_sig = sig_bytes
+                loaded_key.verify(test_sig, msg_bytes, ec.ECDSA(hashes.SHA256()))
                 return True
         except Exception:
             return False
