@@ -218,6 +218,7 @@ app.include_router(attendance_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
 
 
+@app.get("/", tags=["Health"])
 @app.get("/health", tags=["Health"])
 @app.get("/api/v1/health", tags=["Health"])
 def health_check(db: Session = Depends(get_db)):

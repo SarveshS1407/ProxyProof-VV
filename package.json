@@ -6,7 +6,7 @@
   "scripts": {
     "build": "cd frontend && npm install && npm run build",
     "test": "cd backend && PYTHONPATH=. pytest",
-    "lint": "cd frontend && tsc --noEmit && cd ../mobile && ../frontend/node_modules/.bin/tsc --noEmit"
+    "lint": "cd frontend && ./node_modules/.bin/tsc --noEmit && cd ../mobile && ../frontend/node_modules/.bin/tsc --noEmit"
   },
   "engines": {
     "node": ">=18.0.0"

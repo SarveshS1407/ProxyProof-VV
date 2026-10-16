@@ -112,39 +112,72 @@ The following environment variables configure ProxyProof. **Never commit real se
 
 ---
 
-## 4. Step-by-Step Vercel Deployment Instructions
+## 4. Resolving the Vercel Import Screen & Deployment Options
 
-### Method 1: Deploy via Vercel Web Dashboard (Git Integration)
+When importing the repository `SarveshS1407/ProxyProof-VV` on Vercel, Vercel's automatic multi-framework detector scans the monorepo and presents three options:
+1. `backend` (FastAPI, `/api`)
+2. `frontend` (Vite)
+3. `app` (FastAPI, `/`)
 
-1. **Push your code to GitHub:**
-   Ensure all changes are committed and pushed to `https://github.com/SarveshS1407/ProxyProof-VV.git` on branch `main`.
+### 4.1 Architecture Analysis: Which is the Real Backend?
+* **The Real Production Backend is `backend/` (`backend/app/main.py`):**  
+  All business logic, database models, schemas, JWT auth, Ed25519 cryptography, and Alembic migrations live inside `backend/app/`.
+* **`app` is NOT an independent, legacy, or secondary service:**  
+  There is NO `app` folder at the root of the repository. Vercel detects `app` because the root has an `api/index.py` that exports `app = FastAPI()` (by importing `from app.main import app` in `backend`). It is purely an artifact of Vercel detecting a root-level Python ASGI entrypoint.
 
-2. **Import Project in Vercel:**
-   - Log in to [Vercel Dashboard](https://vercel.com/dashboard).
-   - Click **Add New...** $\to$ **Project**.
-   - Select your GitHub repository: `ProxyProof-VV`.
+---
 
-3. **Configure Project Settings:**
-   - **Project Name:** `proxyproof`
-   - **Framework Preset:** `Vite`
-   - **Root Directory:** Leave as `./` (Root directory) to enable full-stack serverless deployment, OR set to `frontend` for frontend-only deployment.
-   - **Build Command:** `cd frontend && npm install && npm run build` (or leave default if using root `package.json`).
-   - **Output Directory:** `frontend/dist`
+### 4.2 Recommended Deployment Strategy: Decoupled Projects (Frontend + Backend)
 
-4. **Configure Environment Variables in Vercel:**
-   In the **Environment Variables** section, add:
+Deploying `frontend` and `backend` as separate Vercel projects is the cleanest, most performant, and standard Vercel architecture:
+* **Zero build collisions:** The Vite build does not conflict with Python serverless runtimes.
+* **Instant edge distribution:** The React SPA is deployed globally on Vercel Edge CDN with 0 cold starts.
+* **Independent scaling:** Static frontend assets and backend serverless functions scale independently.
+
+#### Project 1: Web Frontend (`frontend`)
+1. In Vercel Import Screen, select **`frontend`** (or click Add New Project -> select `frontend` directory).
+2. **Framework Preset:** `Vite` (automatically detected).
+3. **Root Directory:** `frontend`
+4. **Build Command:** `npm run build` (default)
+5. **Output Directory:** `dist` (default)
+6. **Environment Variables:**
+   ```env
+   VITE_API_URL=https://<your-backend-project>.vercel.app
+   ```
+   *(Note: Leave `VITE_WS_URL` empty to let the client automatically use the built-in 5-second polling fallback, or set to your persistent backend if using Option B).*
+
+#### Project 2: API Backend (`backend`)
+1. In Vercel, click **Add New Project** $\to$ select `ProxyProof-VV`.
+2. In the import screen, select **`backend`** (Root Directory: `backend`).
+3. **Framework Preset:** `FastAPI` (or `Other`).
+4. **Root Directory:** `backend`
+5. **Environment Variables:**
    ```env
    ENVIRONMENT=production
    DEBUG=false
    SECRET_KEY=<your-generated-openssl-rand-hex-32>
    DATABASE_URL=postgresql://<user>:<password>@<neon-host>/proxyproof?sslmode=require
-   CORS_ORIGINS=https://proxyproof.vercel.app,https://proxyproof-*.vercel.app
+   CORS_ORIGINS=https://<your-frontend-project>.vercel.app,https://*.vercel.app
+   SEED_DEMO_DATA=false
+   AUTO_CREATE_TABLES=false
+   BLE_SERVICE_UUID=0000ff01-0000-1000-8000-00805f9b34fb
+   BLE_TOKEN_ROTATION_SECONDS=30
+   DEFAULT_MIN_RSSI=-80
    ```
+6. **Routing:** `backend/vercel.json` and `backend/api/index.py` handle all `/api/v1/*` and `/health` requests automatically.
 
-5. **Deploy:**
-   - Click **Deploy**.
-   - Vercel will install dependencies from `requirements.txt` and `package.json`, compile the frontend bundle, and configure serverless functions.
-   - Once complete, Vercel will assign your production URL (e.g. `https://proxyproof.vercel.app`).
+---
+
+### 4.3 Alternative Option: Single Unified Project (`app`, Root `/`)
+
+If you prefer to deploy everything under a single Vercel project and single URL (e.g., `https://proxyproof.vercel.app`):
+1. In the Vercel Import Screen, select **`app`** (Root Directory: `./`).
+2. **CRITICAL:** Change **Framework Preset** from `FastAPI` to **`Other`**.  
+   *(If left as `FastAPI`, Vercel skips the Node.js frontend build step and will not compile `frontend/dist`).*
+3. **Build Command:** `npm run build` (which runs `cd frontend && npm install && npm run build`)
+4. **Output Directory:** `frontend/dist`
+5. **Environment Variables:** Set all Backend variables (`DATABASE_URL`, `SECRET_KEY`, `CORS_ORIGINS`, etc.). `VITE_API_URL` is NOT required because the frontend automatically defaults to same-origin relative `/api/v1`.
+6. **Routing:** Root `vercel.json` rewrites `/api/*` and `/health` to `/api/index.py`, and all other routes `/*` to `frontend/dist/index.html`.
 
 ---
 
