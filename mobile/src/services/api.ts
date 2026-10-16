@@ -100,4 +100,38 @@ export const mobileApi = {
     });
     return res.json();
   },
+
+  async startSession(sessionId: number) {
+    const res = await fetch(`${API_BASE_URL}/sessions/${sessionId}/start`, {
+      method: 'POST',
+      headers: { ...authHeaders() },
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to start session');
+    }
+    return res.json();
+  },
+
+  async stopSession(sessionId: number) {
+    const res = await fetch(`${API_BASE_URL}/sessions/${sessionId}/stop`, {
+      method: 'POST',
+      headers: { ...authHeaders() },
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to stop session');
+    }
+    return res.json();
+  },
+
+  async getSessionAttendance(sessionId: number) {
+    const res = await fetch(`${API_BASE_URL}/attendance/session/${sessionId}`, {
+      headers: { ...authHeaders() },
+    });
+    if (!res.ok) {
+      return [];
+    }
+    return res.json();
+  },
 };
