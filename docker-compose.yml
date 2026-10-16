@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: proxyproof-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PROJECT_NAME=ProxyProof
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - SECRET_KEY=replace-with-a-secure-production-key-at-least-32-chars
+      - DATABASE_URL=sqlite:///./proxyproof.db
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:8080
+      - BLE_SERVICE_UUID=0000FD00-0000-1000-8000-00805F9B34FB
+      - BLE_TOKEN_ROTATION_SECONDS=10
+      - DEFAULT_MIN_RSSI=-85
+    volumes:
+      - proxyproof-db-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: proxyproof-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  proxyproof-db-data:

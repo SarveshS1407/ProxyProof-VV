@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "ProxyProof",
+    "slug": "proxyproof",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#4f46e5"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "edu.proxyproof.attendance",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "ProxyProof uses Bluetooth Low Energy to automatically verify your attendance when you are present in the classroom.",
+        "NSBluetoothPeripheralUsageDescription": "ProxyProof organisers broadcast attendance session tokens over Bluetooth Low Energy.",
+        "UIBackgroundModes": ["bluetooth-central", "bluetooth-peripheral"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#4f46e5"
+      },
+      "package": "edu.proxyproof.attendance",
+      "permissions": [
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_ADVERTISE",
+        "BLUETOOTH_CONNECT",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "plugins": [
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "modes": ["peripheral", "central"]
+        }
+      ]
+    ]
+  }
+}

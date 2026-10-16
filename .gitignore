@@ -1,0 +1,25 @@
+# Environments & Virtualenvs
+.venv/
+env/
+venv/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+*.db
+.pytest_cache/
+
+# Node / Frontend / Mobile
+node_modules/
+dist/
+build/
+.expo/
+.next/
+*.log
+
+# Environment files
+.env
+.DS_Store
