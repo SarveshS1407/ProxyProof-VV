@@ -362,7 +362,7 @@ npm install
 # 3. Start the Vite development server
 npm run dev
 ```
-* **Web Application:** [http://localhost:5173](http://localhost:5173)
+* **Web Application:** [http://localhost:5174](http://localhost:5174) (default port `5174` configured in `vite.config.ts`)
 
 ### 3. Mobile Application Setup (Expo / React Native)
 
