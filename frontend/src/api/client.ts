@@ -242,6 +242,16 @@ export const api = {
     return handleResponse(res);
   },
 
+  async exportAttendanceCSV(sessionId: number): Promise<string> {
+    const res = await fetch(`${API_BASE_URL}/attendance/session/${sessionId}/export-csv`, {
+      headers: { ...getAuthHeader() },
+    });
+    if (!res.ok) {
+      throw new Error(`Export failed with status ${res.status}`);
+    }
+    return res.text();
+  },
+
   getExportCsvUrl(sessionId: number): string {
     return `${API_BASE_URL}/attendance/session/${sessionId}/export-csv`;
   },

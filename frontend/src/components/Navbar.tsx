@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Bluetooth, Shield, LogOut, User as UserIcon, Calendar, CheckCircle2 } from 'lucide-react';
+import { Bluetooth, Shield, LogOut, Calendar, CheckCircle2, LayoutDashboard, Smartphone, User } from 'lucide-react';
 
 interface NavbarProps {
   currentTab: string;
@@ -13,96 +13,146 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab }) => 
   if (!user) return null;
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-      <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '4.25rem' }}>
-        
-        {/* Logo and Brand */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => setCurrentTab('home')}>
-          <div style={{
-            background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
-            color: 'white',
-            padding: '0.5rem',
-            borderRadius: '0.625rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.2)'
-          }}>
-            <Bluetooth size={22} />
-          </div>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-              ProxyProof
+    <>
+      {/* Top Header */}
+      <header style={{
+        backgroundColor: '#ffffff',
+        borderBottom: '1px solid #e2e8f0',
+        position: 'sticky',
+        top: 0,
+        zIndex: 40,
+        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)'
+      }}>
+        <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '4rem' }}>
+          
+          {/* Logo and Brand */}
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}
+            onClick={() => {
+              if (user.role === 'organiser') setCurrentTab('organiser');
+              else if (user.role === 'student') setCurrentTab('student');
+              else if (user.role === 'admin') setCurrentTab('admin');
+            }}
+          >
+            <div style={{
+              backgroundColor: '#4f46e5',
+              color: '#ffffff',
+              padding: '0.45rem',
+              borderRadius: '0.625rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 4px rgba(79, 70, 229, 0.25)'
+            }}>
+              <Bluetooth size={20} />
             </div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>
-              BLE Anti-Proxy Attendance
-            </div>
-          </div>
-        </div>
-
-        {/* Role-based Navigation Tabs */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {user.role === 'organiser' || user.role === 'admin' ? (
-            <button
-              onClick={() => setCurrentTab('organiser')}
-              className={`btn ${currentTab === 'organiser' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ padding: '0.5rem 1rem' }}
-            >
-              <Calendar size={16} />
-              <span>Organiser Dashboard</span>
-            </button>
-          ) : null}
-
-          {user.role === 'student' || user.role === 'admin' ? (
-            <button
-              onClick={() => setCurrentTab('student')}
-              className={`btn ${currentTab === 'student' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ padding: '0.5rem 1rem' }}
-            >
-              <CheckCircle2 size={16} />
-              <span>Student Check-In</span>
-            </button>
-          ) : null}
-
-          {user.role === 'admin' ? (
-            <button
-              onClick={() => setCurrentTab('admin')}
-              className={`btn ${currentTab === 'admin' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ padding: '0.5rem 1rem' }}
-            >
-              <Shield size={16} />
-              <span>Admin Console</span>
-            </button>
-          ) : null}
-        </div>
-
-        {/* User Profile and Logout */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', textAlign: 'right' }}>
             <div>
-              <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#1e293b' }}>
+              <div style={{ fontWeight: 800, fontSize: '1.125rem', color: '#0f172a', letterSpacing: '-0.025em', lineHeight: 1.15 }}>
+                ProxyProof
+              </div>
+              <div style={{ fontSize: '0.6875rem', color: '#64748b', fontWeight: 500, letterSpacing: '0.01em' }}>
+                BLE Attendance Shield
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop Navigation Tabs (Hidden on small mobile screens) */}
+          <nav style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }} className="hide-mobile">
+            {(user.role === 'organiser' || user.role === 'admin') && (
+              <button
+                onClick={() => setCurrentTab('organiser')}
+                className={`btn btn-sm ${currentTab === 'organiser' ? 'btn-primary' : 'btn-ghost'}`}
+              >
+                <Calendar size={15} />
+                <span>Organiser</span>
+              </button>
+            )}
+
+            {(user.role === 'student' || user.role === 'admin') && (
+              <button
+                onClick={() => setCurrentTab('student')}
+                className={`btn btn-sm ${currentTab === 'student' ? 'btn-primary' : 'btn-ghost'}`}
+              >
+                <CheckCircle2 size={15} />
+                <span>Student Check-In</span>
+              </button>
+            )}
+
+            {user.role === 'admin' && (
+              <button
+                onClick={() => setCurrentTab('admin')}
+                className={`btn btn-sm ${currentTab === 'admin' ? 'btn-primary' : 'btn-ghost'}`}
+              >
+                <Shield size={15} />
+                <span>Admin Console</span>
+              </button>
+            )}
+          </nav>
+
+          {/* User Profile & Logout */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: '#0f172a', lineHeight: 1.2 }}>
                 {user.full_name}
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                {user.student_profile?.student_id_number || user.email}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.15rem' }}>
+                <span className={`badge badge-${user.role === 'admin' ? 'late' : user.role === 'organiser' ? 'excused' : 'approved'}`} style={{ fontSize: '0.625rem', padding: '0.1rem 0.45rem' }}>
+                  {user.role}
+                </span>
+                {user.student_profile?.student_id_number && (
+                  <span style={{ fontSize: '0.6875rem', color: '#64748b', fontFamily: 'var(--font-mono)' }}>
+                    {user.student_profile.student_id_number}
+                  </span>
+                )}
               </div>
             </div>
-            <span className={`badge badge-${user.role === 'admin' ? 'late' : user.role === 'organiser' ? 'excused' : 'approved'}`}>
-              {user.role}
-            </span>
+
+            <button
+              onClick={logout}
+              className="btn btn-secondary btn-sm"
+              title="Sign Out"
+              aria-label="Sign out of account"
+              style={{ padding: '0.45rem 0.65rem' }}
+            >
+              <LogOut size={15} />
+            </button>
           </div>
 
-          <button
-            onClick={logout}
-            className="btn btn-secondary"
-            title="Log Out"
-            style={{ padding: '0.5rem 0.75rem' }}
-          >
-            <LogOut size={16} />
-          </button>
         </div>
+      </header>
 
-      </div>
-    </header>
+      {/* Mobile Bottom Navigation Bar (Visible on mobile screens <= 768px) */}
+      <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
+        {(user.role === 'student' || user.role === 'admin') && (
+          <button
+            onClick={() => setCurrentTab('student')}
+            className={`mobile-nav-btn ${currentTab === 'student' ? 'active' : ''}`}
+          >
+            <CheckCircle2 size={18} />
+            <span>Check-In</span>
+          </button>
+        )}
+
+        {(user.role === 'organiser' || user.role === 'admin') && (
+          <button
+            onClick={() => setCurrentTab('organiser')}
+            className={`mobile-nav-btn ${currentTab === 'organiser' ? 'active' : ''}`}
+          >
+            <Calendar size={18} />
+            <span>Organiser</span>
+          </button>
+        )}
+
+        {user.role === 'admin' && (
+          <button
+            onClick={() => setCurrentTab('admin')}
+            className={`mobile-nav-btn ${currentTab === 'admin' ? 'active' : ''}`}
+          >
+            <Shield size={18} />
+            <span>Admin</span>
+          </button>
+        )}
+      </nav>
+    </>
   );
 };

@@ -183,15 +183,16 @@ ProxyProof Multi-Tier Architecture
 
 ## 8. Prioritised Implementation Checklist
 
-### Phase 1: High-Priority Safe Fixes (Immediate)
-- [ ] Fix empty Alembic initial migration so `alembic upgrade head` creates all tables deterministically.
-- [ ] Add initial Device Registration action on `StudentPortal.tsx` for students without an approved device.
-- [ ] Add Course Creation and Student Enrollment UI modals in `OrganiserDashboard.tsx`.
-- [ ] Parameterize API and WebSocket base URLs in frontend (`import.meta.env.VITE_API_URL` and `VITE_WS_URL`).
-- [ ] Add `vercel.json` in `frontend/` for SPA route rewrite handling.
-- [ ] Implement client-side WebCrypto keypair generation and authentic challenge signing in `StudentPortal.tsx`.
-- [ ] Replace `prompt()` and `confirm()` browser dialogs in `AdminPortal.tsx` with accessible React modals.
-- [ ] Add auto-reconnection logic and connection status indicator to WebSockets in `OrganiserDashboard.tsx`.
+### Phase 1: High-Priority Safe Fixes (Completed)
+- [x] Fix empty Alembic initial migration so `alembic upgrade head` creates all tables deterministically.
+- [x] Add initial Device Registration action on `StudentPortal.tsx` for students without an approved device.
+- [x] Add Course Creation and Student Enrollment UI modals in `OrganiserDashboard.tsx`.
+- [x] Parameterize API and WebSocket base URLs in frontend (`import.meta.env.VITE_API_URL` and `VITE_WS_URL`).
+- [x] Add `vercel.json` in `frontend/` for SPA route rewrite handling.
+- [x] Implement client-side WebCrypto keypair generation and authentic challenge signing in `StudentPortal.tsx`.
+- [x] Replace `prompt()` and `confirm()` browser dialogs in `AdminPortal.tsx` and `OrganiserDashboard.tsx` with accessible React modals.
+- [x] Add auto-reconnection logic and connection status indicator to WebSockets in `OrganiserDashboard.tsx`.
+- [x] Redesign visual system across Student, Organiser, Admin, Login, and Register pages with custom responsive CSS.
 
 ### Phase 2: Security & Edge Case Hardening
 - [ ] Validate device public key format upon registration in backend.
@@ -203,3 +204,55 @@ ProxyProof Multi-Tier Architecture
 - [ ] Add `react-native-ble-plx` to `mobile/package.json` dependencies.
 - [ ] Implement native asymmetric key signing via WebCrypto / tweetnacl in mobile service.
 - [ ] Configure Expo EAS build profile for Android APK and iOS ipa generation.
+
+---
+
+## 9. Phase 1 — UI/UX Redesign Implementation Summary
+
+### 9.1 Visual System & Design Architecture
+* **Design System Foundation:** Implemented in `frontend/src/index.css` using CSS custom properties for maintainability without heavy external framework bloat.
+  * **Neutrals (Slate):** Balanced scale from `--slate-50` background to `--slate-900` text headings.
+  * **Brand Primary (Academic Indigo):** `--primary-600` (`#4f46e5`) and `--primary-700` (`#4338ca`) for authoritative university identity.
+  * **Semantics:** Emerald (`#059669`) for verified attendance/approved devices, Amber (`#d97706`) for late attendance/pending reviews, Rose (`#e11d48`) for absences/rejections/errors, and Sky (`#0284c7`) for excused absences.
+  * **Typography & Contrast:** System font stack (`-apple-system, Segoe UI, Roboto`) with minimum 4.5:1 text contrast for WCAG AA compliance. Visible focus outlines (`outline: 2px solid var(--primary-600)`) on all interactive elements.
+  * **Mobile Navigation:** Fixed mobile bottom navigation bar (`.mobile-bottom-nav`) with touch targets $\ge 44\text{px}$ on viewport widths $\le 768\text{px}$, combined with responsive top navigation on desktop.
+
+### 9.2 Reusable Component Catalog
+1. **`ToastContext` (`frontend/src/context/ToastContext.tsx`):**
+   * Accessible, non-blocking toast notifications replacing native `alert()` dialogs.
+   * Supports `success`, `error`, and `info` with icons, auto-dismiss (4.5s), and manual close triggers.
+2. **`ConfirmModal` (`frontend/src/components/common/ConfirmModal.tsx`):**
+   * Accessible dialog with focus trapping and keyboard navigation (`Escape` to dismiss, `Enter` to confirm).
+   * Supports `danger`, `warning`, and `primary` actions with explanatory warning callouts for destructive actions (e.g., closing sessions, suspending users).
+3. **`StatusPill` (`frontend/src/components/common/StatusPill.tsx`):**
+   * Standardized status pills for attendance records (`PRESENT`, `LATE`, `EXCUSED`, `ABSENT`), device requests (`PENDING`, `APPROVED`, `REJECTED`, `REVOKED`), and user accounts (`ACTIVE`, `SUSPENDED`).
+4. **`SignalMeter` (`frontend/src/components/common/SignalMeter.tsx`):**
+   * Visual 4-bar RSSI proximity indicator with color-coded signal thresholds (Strong $\ge -65$ dBm, Medium $-80$ to $-66$ dBm, Weak $\le -81$ dBm) and distance calculation.
+5. **`EmptyState` (`frontend/src/components/common/EmptyState.tsx`):**
+   * Clean illustrations for empty tables, search filters with zero matches, or uninitiated states.
+
+### 9.3 Role Experience Upgrades
+* **Student Experience (`StudentPortal.tsx`):**
+  * 4 sub-views: `Live Check-In`, `My Courses & Stats`, `Registered Device`, and `Account Profile`.
+  * Real cryptographic keypair generation using standard W3C WebCrypto (ECDSA P-256) stored in client storage.
+  * Signal proximity simulation with distance meter and real-time RSSI calculation.
+  * Multi-stage verification UI: Searching $\to$ Beacon Detected $\to$ Challenge Signing $\to$ Attendance Confirmed.
+  * Course-wise percentage progress bars with warning highlights when attendance drops below $75\%$.
+* **Organiser Experience (`OrganiserDashboard.tsx`):**
+  * Live token rotation countdown with animated circular progress indicator.
+  * Real-time attendance roster connected to WebSocket stream with search filter and status filter.
+  * One-click CSV report export with Bearer token authentication.
+  * Accessible modals for creating courses, enrolling students, and confirming session closure.
+* **Administrator Experience (`AdminPortal.tsx`):**
+  * System overview metric cards for Users, Active Sessions, Verified Records, and Pending Device Requests.
+  * 3 tabs with search and filters: Device Replacement Requests, User Accounts, and Security Audit Trail.
+  * Device review modal requiring admin notes for rejections.
+  * Account suspension/activation with confirm modal detailing security implications.
+* **Authentication Experience (`Login.tsx` & `Register.tsx`):**
+  * Password visibility toggles, clear input labels with `htmlFor`, and role selection cards.
+  * One-click demo switcher with visual role identifiers for rapid multi-role evaluation.
+
+### 9.4 Verification Results
+* **Frontend Production Build:** `npm run build` $\to$ Exit code `0` (1511 modules transformed, 0 errors, built in 1.05s).
+* **Backend Automated Suite:** `pytest` $\to$ Exit code `0` (26 passed, 100% pass rate in 8.35s).
+
