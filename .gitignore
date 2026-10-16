@@ -4,13 +4,15 @@ env/
 venv/
 ENV/
 
-# Python
+# Python & Testing
 __pycache__/
 *.py[cod]
 *$py.class
 *.sqlite3
 *.db
 .pytest_cache/
+.coverage
+htmlcov/
 
 # Node / Frontend / Mobile
 node_modules/
@@ -19,7 +21,23 @@ build/
 .expo/
 .next/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Environment files
+# Environment files & Secrets
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+
+# Operating System & IDE
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
