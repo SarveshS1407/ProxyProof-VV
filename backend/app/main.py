@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
 import logging
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, status
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+
+from app.core.rate_limit import RateLimitMiddleware
 
 from app.config import settings
 from app.database import engine, Base, SessionLocal
@@ -138,6 +140,21 @@ app = FastAPI(
     description="Mobile-First Bluetooth Low Energy Attendance System with Anti-Proxy Replay Protection and Cryptographic Verification",
     lifespan=lifespan,
 )
+
+# Security Headers Middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
+# Rate Limiting Middleware
+app.add_middleware(RateLimitMiddleware)
+
 
 # CORS Middleware
 app.add_middleware(

@@ -5,6 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -31,7 +32,7 @@ def sanitize_csv_cell(value: str) -> str:
     if not value:
         return ""
     str_val = str(value).strip()
-    if str_val.startswith(("=", "+", "-", "@", "\t", "\r")):
+    if str_val.startswith(("=", "+", "-", "@", "\t", "\r", "|", "%")):
         return f"'{str_val}"
     return str_val
 
@@ -79,6 +80,17 @@ async def submit_attendance(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Attendance already recorded for this session at {existing_record.recorded_at.isoformat()} UTC (Status: {existing_record.status.value})"
         )
+
+    # 3b. Nonce Replay Check
+    if attendance_in.nonce:
+        existing_nonce = db.query(AttendanceRecord).filter(
+            AttendanceRecord.nonce == attendance_in.nonce.strip()
+        ).first()
+        if existing_nonce:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Nonce has already been consumed. Replay attack detected."
+            )
 
     # 4. Device Binding Verification
     approved_device = db.query(Device).filter(
@@ -161,7 +173,14 @@ async def submit_attendance(
         details=f"Student {profile.student_id_number} verified attendance for session {session.id} (RSSI: {attendance_in.rssi} dBm)"
     )
     db.add(audit)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Attendance already recorded for this session (concurrent submission resolved)."
+        )
     db.refresh(record)
 
     # 9. Real-time broadcast to Organiser Dashboard

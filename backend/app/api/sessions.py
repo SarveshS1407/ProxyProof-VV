@@ -225,6 +225,11 @@ async def start_session(
     s = db.query(AttendanceSession).filter(AttendanceSession.id == session_id).first()
     if not s:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    if current_user.role != UserRole.ADMIN and s.organiser_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to start another organiser's session"
+        )
     if s.is_closed:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot restart a closed session")
     if s.is_active:
@@ -273,6 +278,11 @@ async def stop_session(
     s = db.query(AttendanceSession).filter(AttendanceSession.id == session_id).first()
     if not s:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    if current_user.role != UserRole.ADMIN and s.organiser_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to stop another organiser's session"
+        )
 
     now = datetime.now(timezone.utc)
     s.is_active = False
@@ -312,6 +322,27 @@ def get_current_token(
 
     if not s.is_active or s.is_closed:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Session is not active")
+
+    # Authorisation check
+    if current_user.role == UserRole.ORGANISER and s.organiser_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to view the token for another organiser's session"
+        )
+    elif current_user.role == UserRole.STUDENT:
+        profile = current_user.student_profile
+        if not profile:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Student profile not found")
+        enrollment = db.query(CourseEnrollment).filter(
+            CourseEnrollment.course_id == s.course_id,
+            CourseEnrollment.student_profile_id == profile.id,
+            CourseEnrollment.is_active == True
+        ).first()
+        if not enrollment:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not enrolled in the course for this attendance session"
+            )
 
     info = get_current_token_info(s)
     return SessionTokenOut(

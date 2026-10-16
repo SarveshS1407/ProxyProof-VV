@@ -124,6 +124,12 @@ def enroll_student(
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
+    if current_user.role != UserRole.ADMIN and course.organiser_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to enroll students in another organiser's course"
+        )
+
     profile = db.query(StudentProfile).filter(
         StudentProfile.student_id_number == req.student_id_number.strip()
     ).first()
@@ -162,6 +168,16 @@ def list_enrolled_students(
     current_user: User = Depends(get_current_organiser),
     db: Session = Depends(get_db)
 ):
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    if current_user.role != UserRole.ADMIN and course.organiser_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to view students for another organiser's course"
+        )
+
     enrollments = db.query(CourseEnrollment).filter(
         CourseEnrollment.course_id == course_id,
         CourseEnrollment.is_active == True

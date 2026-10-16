@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     RSSI_VARIANCE_TOLERANCE: int = 15
     CHALLENGE_TIMEOUT_SECONDS: int = 60
 
+    # Rate Limiting
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_LOGIN_MAX_REQUESTS: int = 10
+    RATE_LIMIT_REGISTER_MAX_REQUESTS: int = 10
+    RATE_LIMIT_SUBMIT_MAX_REQUESTS: int = 30
+    RATE_LIMIT_WINDOW_SECONDS: int = 60
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
