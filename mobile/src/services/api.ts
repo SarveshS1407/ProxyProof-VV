@@ -1,8 +1,11 @@
 import { Platform } from 'react-native';
 
-// Use 10.0.2.2 for Android emulator, localhost for iOS simulator or web
+// Production backend URL from EXPO_PUBLIC_API_URL, or emulator/localhost fallback in development
+const configuredUrl = typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_API_URL;
 const BASE_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-export const API_BASE_URL = `http://${BASE_HOST}:8000/api/v1`;
+export const API_BASE_URL = configuredUrl
+  ? configuredUrl.replace(/\/+$/, '') + (configuredUrl.endsWith('/api/v1') ? '' : '/api/v1')
+  : `http://${BASE_HOST}:8000/api/v1`;
 
 let authToken: string | null = null;
 

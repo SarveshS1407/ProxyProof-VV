@@ -51,3 +51,4 @@ declare module 'react-native-ble-plx' {
 
 declare var Buffer: any;
 declare var require: any;
+declare var process: any;

@@ -1,0 +1,14 @@
+{
+  "name": "proxyproof-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ProxyProof Bluetooth Low Energy Attendance System",
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "test": "cd backend && PYTHONPATH=. pytest",
+    "lint": "cd frontend && tsc --noEmit && cd ../mobile && ../frontend/node_modules/.bin/tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

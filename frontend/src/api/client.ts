@@ -4,11 +4,17 @@ import {
   UserProfileUpdateData, AttendanceInvestigationItem
 } from '../types';
 
-const envApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-export const API_BASE_URL = envApiUrl.replace(/\/+$/, '') + (envApiUrl.endsWith('/api/v1') ? '' : '/api/v1');
+const envApiUrl = import.meta.env.VITE_API_URL;
+export const API_BASE_URL = (envApiUrl !== undefined && envApiUrl !== null && envApiUrl !== '')
+  ? envApiUrl.replace(/\/+$/, '') + (envApiUrl.endsWith('/api/v1') ? '' : '/api/v1')
+  : (typeof window !== 'undefined' ? '/api/v1' : 'http://localhost:8000/api/v1');
 
-const envWsUrl = import.meta.env.VITE_WS_URL || (envApiUrl.startsWith('https://') ? envApiUrl.replace(/^https:/, 'wss:') : envApiUrl.replace(/^http:/, 'ws:'));
-export const WS_BASE_URL = envWsUrl.replace(/\/+$/, '') + (envWsUrl.endsWith('/api/v1') ? '' : '/api/v1');
+const envWsUrl = import.meta.env.VITE_WS_URL;
+export const WS_BASE_URL = (envWsUrl !== undefined && envWsUrl !== null && envWsUrl !== '')
+  ? envWsUrl.replace(/\/+$/, '') + (envWsUrl.endsWith('/api/v1') ? '' : '/api/v1')
+  : (typeof window !== 'undefined'
+      ? (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/api/v1'
+      : 'ws://localhost:8000/api/v1');
 
 function getAuthHeader(): Record<string, string> {
   const token = localStorage.getItem('proxyproof_token');

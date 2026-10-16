@@ -134,7 +134,7 @@ For instant testing and evaluation, the database automatically initializes with 
 
 ## 5. Automated Test Suite
 
-A comprehensive automated test suite covers authentication, role authorization, device binding, cryptographic proof verification, rotating token freshness, replay rejection, RSSI threshold enforcement, manual attendance overrides, percentage calculations, and CSV sanitization:
+A comprehensive automated test suite covers authentication, role authorization, device binding, cryptographic proof verification, rotating token freshness, replay rejection, RSSI threshold enforcement, manual attendance overrides, percentage calculations, security headers, rate limiting, and CSV formula injection sanitization:
 
 ```bash
 source .venv/bin/activate
@@ -142,19 +142,36 @@ cd backend
 python -m pytest app/tests -v
 ```
 
-### Verified Test Results (36 Passed, 100% Pass Rate):
-* `test_admin.py` — Admin metrics, audit log inspection, user role updates, direct device revocation, and forensic attendance investigation filters.
-* `test_attendance.py` — End-to-end check-in, duplicate prevention (409 Conflict), weak signal rejection, expired token rejection, cross-organiser ownership isolation (403 Forbidden), manual overrides, and sanitized CSV generation.
-* `test_auth.py` — Registration, duplicate checking, password hashing, token issuing, profile attribute updates, and password changes with current password verification.
-* `test_crypto.py` — Asymmetric keypair generation, signature verification (Ed25519 & ECDSA P-256), payload tampering detection, and public key format validation.
-* `test_device.py` — Single-device binding, public key validation (Ed25519, SPKI PEM, SEC1 points), duplicate hardware rejection, and device replacement approval workflow.
-* `test_reports.py` — Attendance percentages, excused session handling, and division-by-zero safety.
+### Verified Test Results (47 Passed, 100% Pass Rate in 16.20s):
+* `test_admin.py` (8 tests) — Admin metrics, audit log inspection, user role updates, direct device revocation, and forensic attendance investigation filters.
+* `test_attendance.py` (6 tests) — End-to-end check-in, duplicate prevention (409 Conflict), weak signal rejection, expired token rejection, cross-organiser ownership isolation (403 Forbidden), manual overrides, and sanitized CSV generation.
+* `test_auth.py` (11 tests) — Registration, duplicate checking, password hashing, token issuing, profile attribute updates, and password changes with current password verification.
+* `test_ble_protocol.py` (4 tests) — Binary packet serialization/deserialization ($\le 31$B frame), clock skew tolerance ($\pm 1$ window), and full advertisement decode.
+* `test_crypto.py` (5 tests) — Asymmetric keypair generation, signature verification (Ed25519 & ECDSA P-256 SPKI), payload tampering detection, and public key format validation.
+* `test_device.py` (4 tests) — Single-device binding, public key validation (Ed25519, SPKI PEM, SEC1 points), duplicate hardware rejection, and device replacement approval workflow.
+* `test_reports.py` (2 tests) — Attendance percentages, excused session handling, and division-by-zero safety.
+* `test_security_hardening.py` (7 tests) — Security headers (`nosniff`, `DENY`, `HSTS`), login rate limiting, cross-role escalation defense, nonce replay prevention, and CSV injection defense.
 
 ---
 
-## 6. Production Deployment
+## 6. Production Deployment on Vercel
 
-### Docker Compose
+ProxyProof supports both **Unified Full-Stack Vercel Deployment** (FastAPI serverless function + Vite SPA) and **Decoupled Architecture** (Vercel Frontend + Dedicated Persistent Backend).
+
+For complete, detailed instructions, see [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md).
+
+### 6.1 Unified Vercel Deployment (Quick Deploy)
+1. Push repository to GitHub: `https://github.com/SarveshS1407/ProxyProof-VV.git`
+2. In [Vercel Dashboard](https://vercel.com/dashboard), import the repository.
+3. Configure Environment Variables in Vercel Console:
+   - `ENVIRONMENT=production`
+   - `DEBUG=false`
+   - `SECRET_KEY=<32-char-random-secret>`
+   - `DATABASE_URL=postgresql://<user>:<pass>@<neon-host>/proxyproof?sslmode=require`
+   - `CORS_ORIGINS=https://proxyproof.vercel.app,https://*.vercel.app`
+4. Click **Deploy**. Vercel automatically builds the Vite frontend bundle and provisions the serverless API via `api/index.py`.
+
+### 6.2 Docker Compose Deployment
 ```bash
 docker-compose up -d --build
 ```
@@ -163,7 +180,21 @@ docker-compose up -d --build
 
 ---
 
-## 7. Security Limitations & Physical World Realities
+## 7. Native Mobile Application (Android & iOS)
+
+The physical Bluetooth Low Energy central scanner and peripheral broadcaster are implemented in `mobile/`.
+* **Configuration:** Copy `mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_API_URL=https://proxyproof.vercel.app`.
+* **Build via EAS CLI:**
+  ```bash
+  cd mobile
+  npm install -g eas-cli
+  eas login
+  eas build --platform android --profile production
+  ```
+
+---
+
+## 8. Security Limitations & Physical World Realities
 
 * **Live Wormhole / High-Speed RF Relay:**
   * While the 10-second token rotation prevents manual screenshot forwarding over chat apps, an advanced adversary with specialized low-latency radio tunnels could relay RF signals in real time.
