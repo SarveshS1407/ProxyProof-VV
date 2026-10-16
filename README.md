@@ -142,13 +142,14 @@ cd backend
 python -m pytest app/tests -v
 ```
 
-### Verified Test Results (47 Passed, 100% Pass Rate in 16.20s):
+### Verified Test Results (56 Passed, 100% Pass Rate in 16.36s):
 * `test_admin.py` (8 tests) — Admin metrics, audit log inspection, user role updates, direct device revocation, and forensic attendance investigation filters.
 * `test_attendance.py` (6 tests) — End-to-end check-in, duplicate prevention (409 Conflict), weak signal rejection, expired token rejection, cross-organiser ownership isolation (403 Forbidden), manual overrides, and sanitized CSV generation.
 * `test_auth.py` (11 tests) — Registration, duplicate checking, password hashing, token issuing, profile attribute updates, and password changes with current password verification.
 * `test_ble_protocol.py` (4 tests) — Binary packet serialization/deserialization ($\le 31$B frame), clock skew tolerance ($\pm 1$ window), and full advertisement decode.
 * `test_crypto.py` (5 tests) — Asymmetric keypair generation, signature verification (Ed25519 & ECDSA P-256 SPKI), payload tampering detection, and public key format validation.
 * `test_device.py` (4 tests) — Single-device binding, public key validation (Ed25519, SPKI PEM, SEC1 points), duplicate hardware rejection, and device replacement approval workflow.
+* `test_production_security.py` (9 tests) — Strict production `SECRET_KEY`, `DEBUG=False`, and PostgreSQL requirements, live database health check validation, opt-in demo seeding, and WebSocket authentication and RBAC authorization.
 * `test_reports.py` (2 tests) — Attendance percentages, excused session handling, and division-by-zero safety.
 * `test_security_hardening.py` (7 tests) — Security headers (`nosniff`, `DENY`, `HSTS`), login rate limiting, cross-role escalation defense, nonce replay prevention, and CSV injection defense.
 

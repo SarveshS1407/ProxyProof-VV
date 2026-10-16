@@ -94,6 +94,10 @@ The following environment variables configure ProxyProof. **Never commit real se
 | `RATE_LIMIT_ENABLED` | No | `true` | Enables sliding window rate limiting on auth and check-in |
 | `RATE_LIMIT_LOGIN_MAX_REQUESTS` | No | `10` | Max login attempts per minute per IP |
 | `RATE_LIMIT_SUBMIT_MAX_REQUESTS` | No | `30` | Max attendance check-ins per minute per IP |
+| `SEED_DEMO_DATA` | No | `false` | Must be `false` in production. Disables demo account generation. |
+| `AUTO_CREATE_TABLES` | No | `false` | Must be `false` in production. Schema is managed via Alembic migrations. |
+| `INITIAL_ADMIN_EMAIL` | Optional | `admin@institution.edu` | Optional bootstrap administrator email for fresh installations. |
+| `INITIAL_ADMIN_PASSWORD` | Optional | *(Secure Password)* | Optional bootstrap administrator password. |
 
 ### 3.2 Frontend Client Environment Variables
 | Variable Name | Required | Example | Purpose / Description |
