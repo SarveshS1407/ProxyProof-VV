@@ -21,19 +21,50 @@ function getAuthHeader(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function handleResponse<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    let errorDetail = 'An unexpected error occurred';
+export async function handleResponse<T>(res: Response): Promise<T> {
+  // Read response body as text exactly once
+  const rawText = await res.text();
+
+  let data: any = null;
+  if (rawText && rawText.trim().length > 0) {
     try {
-      const errJson = await res.json();
-      errorDetail = errJson.detail || errJson.message || JSON.stringify(errJson);
+      data = JSON.parse(rawText);
     } catch {
-      errorDetail = await res.text();
+      // Body is plain text, HTML, or non-JSON
+      data = null;
     }
+  }
+
+  if (!res.ok) {
+    let errorDetail = '';
+
+    if (data && typeof data === 'object') {
+      if (typeof data.detail === 'string') {
+        errorDetail = data.detail;
+      } else if (Array.isArray(data.detail)) {
+        // Handle FastAPI validation error array [{msg, loc, ...}]
+        errorDetail = data.detail.map((err: any) => err.msg || JSON.stringify(err)).join(', ');
+      } else if (data.message && typeof data.message === 'string') {
+        errorDetail = data.message;
+      } else {
+        errorDetail = JSON.stringify(data);
+      }
+    } else if (rawText && rawText.trim().length > 0) {
+      errorDetail = rawText.trim();
+    }
+
     throw new Error(errorDetail || `Request failed with status ${res.status}`);
   }
-  return res.json() as Promise<T>;
+
+  // Handle successful response
+  if (data !== null) {
+    return data as T;
+  }
+
+  // If status is 204 or body is empty, return empty object safely
+  return (rawText ? rawText : {}) as unknown as T;
 }
+
 
 export const api = {
   // Auth
@@ -275,10 +306,18 @@ export const api = {
     const res = await fetch(`${API_BASE_URL}/attendance/session/${sessionId}/export-csv`, {
       headers: { ...getAuthHeader() },
     });
+    const text = await res.text();
     if (!res.ok) {
-      throw new Error(`Export failed with status ${res.status}`);
+      let errorDetail = '';
+      try {
+        const json = JSON.parse(text);
+        errorDetail = json.detail || json.message;
+      } catch {
+        errorDetail = text;
+      }
+      throw new Error(errorDetail || `Export failed with status ${res.status}`);
     }
-    return res.text();
+    return text;
   },
 
   getExportCsvUrl(sessionId: number): string {

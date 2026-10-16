@@ -7,5 +7,24 @@ export default defineConfig({
     port: 5174,
     strictPort: true,
     host: true,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        ws: true,
+      },
+      '/health': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/docs': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/openapi.json': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+    },
   },
 });
