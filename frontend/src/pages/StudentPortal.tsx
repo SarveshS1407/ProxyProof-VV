@@ -16,10 +16,18 @@ import {
 } from 'lucide-react';
 
 export const StudentPortal: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'checkin' | 'courses' | 'device' | 'profile'>('checkin');
+  const [activeTab, setActiveTab] = useState<'checkin' | 'courses' | 'device' | 'profile'>(() => {
+    return (localStorage.getItem('proxyproof_student_tab') as any) || 'checkin';
+  });
+
+  const handleTabSwitch = (tab: 'checkin' | 'courses' | 'device' | 'profile') => {
+    setActiveTab(tab);
+    localStorage.setItem('proxyproof_student_tab', tab);
+  };
+
   const [devices, setDevices] = useState<Device[]>([]);
   const [report, setReport] = useState<StudentReport | null>(null);
   const [activeSessions, setActiveSessions] = useState<AttendanceSession[]>([]);
@@ -36,6 +44,26 @@ export const StudentPortal: React.FC = () => {
   const [newDeviceModel, setNewDeviceModel] = useState('');
   const [changeReason, setChangeReason] = useState('');
   const [submittingChange, setSubmittingChange] = useState(false);
+
+  // Profile Edit State
+  const [editFullName, setEditFullName] = useState(user?.full_name || '');
+  const [editDept, setEditDept] = useState(user?.student_profile?.department || '');
+  const [editBatch, setEditBatch] = useState(user?.student_profile?.batch || '');
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // Password Change State
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setEditFullName(user.full_name);
+      setEditDept(user.student_profile?.department || '');
+      setEditBatch(user.student_profile?.batch || '');
+    }
+  }, [user]);
 
   // Filters
   const [courseFilter, setCourseFilter] = useState<string>('ALL');
@@ -178,6 +206,56 @@ export const StudentPortal: React.FC = () => {
     }
   };
 
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSavingProfile(true);
+      await api.updateProfile({
+        full_name: editFullName.trim(),
+        department: editDept.trim(),
+        batch: editBatch.trim()
+      });
+      showToast('success', 'Profile details updated successfully');
+      if (refreshUser) await refreshUser();
+    } catch (err: any) {
+      showToast('error', `Failed to update profile: ${err.message}`);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword) {
+      showToast('error', 'Please enter your current password');
+      return;
+    }
+    if (newPassword.length < 6) {
+      showToast('error', 'New password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('error', 'New passwords do not match');
+      return;
+    }
+
+    try {
+      setSavingPassword(true);
+      await api.updateProfile({
+        current_password: currentPassword,
+        new_password: newPassword
+      });
+      showToast('success', 'Password updated successfully! Keep your credentials safe.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      showToast('error', `Password update failed: ${err.message}`);
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   // Filter history
   const filteredHistory = report?.history.filter((h) => {
     if (courseFilter === 'ALL') return true;
@@ -249,7 +327,7 @@ export const StudentPortal: React.FC = () => {
       {/* Navigation Sub-Tabs */}
       <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', marginBottom: '1.75rem', gap: '0.5rem', overflowX: 'auto' }}>
         <button
-          onClick={() => setActiveTab('checkin')}
+          onClick={() => handleTabSwitch('checkin')}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -272,7 +350,7 @@ export const StudentPortal: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('courses')}
+          onClick={() => handleTabSwitch('courses')}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -295,7 +373,7 @@ export const StudentPortal: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('device')}
+          onClick={() => handleTabSwitch('device')}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -318,7 +396,7 @@ export const StudentPortal: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('profile')}
+          onClick={() => handleTabSwitch('profile')}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -517,8 +595,35 @@ export const StudentPortal: React.FC = () => {
                 </div>
 
                 {checkInStep === 'ERROR' && (
-                  <div style={{ padding: '0.875rem 1rem', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '0.5rem', color: '#be123c', fontSize: '0.8125rem', marginBottom: '1.25rem' }}>
-                    {checkInMessage}
+                  <div style={{ padding: '1rem', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '0.625rem', marginBottom: '1.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#be123c', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.375rem' }}>
+                      <AlertTriangle size={16} />
+                      <span>Verification Issue Detected</span>
+                    </div>
+                    <p style={{ color: '#9f1239', fontSize: '0.8125rem', margin: 0, lineHeight: 1.4 }}>
+                      {checkInMessage}
+                    </p>
+                    <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', background: '#ffffff', borderRadius: '0.375rem', border: '1px solid #ffe4e6', fontSize: '0.75rem', color: '#881337' }}>
+                      <strong>Troubleshooting:</strong> {
+                        checkInMessage.toLowerCase().includes('rssi') || checkInMessage.toLowerCase().includes('proximity') || checkInMessage.toLowerCase().includes('far')
+                          ? 'Move physically closer to the instructor beacon. RSSI signal is below minimum threshold.'
+                          : checkInMessage.toLowerCase().includes('token') || checkInMessage.toLowerCase().includes('expire')
+                          ? 'Beacon token rotates rapidly (every 10-15s). Tap below to retry with a fresh token.'
+                          : checkInMessage.toLowerCase().includes('device') || checkInMessage.toLowerCase().includes('key')
+                          ? 'Device signature rejected. Ensure you are using your approved registered browser/device.'
+                          : checkInMessage.toLowerCase().includes('already')
+                          ? 'Attendance has already been recorded for this session. Check your course stats.'
+                          : 'Ensure Bluetooth is active and your session is still marked LIVE by the organiser.'
+                      }
+                    </div>
+                    <button
+                      onClick={() => { setCheckInStep('IDLE'); setCheckInMessage(''); }}
+                      className="btn btn-secondary btn-sm"
+                      style={{ marginTop: '0.75rem', width: '100%' }}
+                    >
+                      <RefreshCw size={13} />
+                      <span>Dismiss & Try Again</span>
+                    </button>
                   </div>
                 )}
 
@@ -818,50 +923,162 @@ export const StudentPortal: React.FC = () => {
 
       {/* TAB 4: ACCOUNT PROFILE */}
       {activeTab === 'profile' && (
-        <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '680px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Institutional Credentials Summary */}
           <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
               <div style={{ padding: '0.625rem', borderRadius: '0.5rem', background: '#e0e7ff', color: '#4338ca' }}>
                 <User size={24} />
               </div>
               <div>
                 <h2 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#0f172a' }}>
-                  Student Identity Profile
+                  Student Institutional Identity
                 </h2>
                 <p style={{ fontSize: '0.8125rem', color: '#64748b' }}>
-                  Institutional student credentials and enrollment details
+                  Verified university credentials bound to your attendance records
                 </p>
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: '#f8fafc', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.625rem' }}>
-                <span style={{ color: '#64748b' }}>Full Legal Name:</span>
-                <span style={{ fontWeight: 600, color: '#0f172a' }}>{user?.full_name}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.625rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', background: '#f8fafc', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
                 <span style={{ color: '#64748b' }}>Student ID Number:</span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#4f46e5' }}>
-                  {user?.student_profile?.student_id_number || 'STU-2024-001'}
+                  {user?.student_profile?.student_id_number || 'STU-PROVISIONAL'}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.625rem' }}>
-                <span style={{ color: '#64748b' }}>Academic Department:</span>
-                <span style={{ fontWeight: 500, color: '#0f172a' }}>
-                  {user?.student_profile?.department || 'Computer Science & Engineering'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.625rem' }}>
-                <span style={{ color: '#64748b' }}>Batch / Class Cohort:</span>
-                <span style={{ fontWeight: 500, color: '#0f172a' }}>
-                  {user?.student_profile?.batch || '2024–2028'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
                 <span style={{ color: '#64748b' }}>Institutional Email:</span>
                 <span style={{ fontWeight: 500, color: '#0f172a' }}>{user?.email}</span>
               </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                <span style={{ color: '#64748b' }}>System Role:</span>
+                <span className="badge badge-approved">STUDENT</span>
+              </div>
             </div>
+          </div>
+
+          {/* Edit Profile Details Form */}
+          <div className="card">
+            <h2 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.375rem' }}>
+              Edit Profile Information
+            </h2>
+            <p style={{ fontSize: '0.8125rem', color: '#64748b', marginBottom: '1.25rem' }}>
+              Update your display name, department, or cohort information.
+            </p>
+
+            <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label className="input-label">Full Legal Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  className="input-field"
+                  placeholder="e.g. Alex Johnson"
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label className="input-label">Academic Department</label>
+                  <input
+                    type="text"
+                    value={editDept}
+                    onChange={(e) => setEditDept(e.target.value)}
+                    className="input-field"
+                    placeholder="e.g. Computer Science"
+                  />
+                </div>
+                <div>
+                  <label className="input-label">Batch / Cohort</label>
+                  <input
+                    type="text"
+                    value={editBatch}
+                    onChange={(e) => setEditBatch(e.target.value)}
+                    className="input-field"
+                    placeholder="e.g. 2024-2028"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  type="submit"
+                  disabled={savingProfile}
+                  className="btn btn-primary"
+                >
+                  <Check size={16} />
+                  <span>{savingProfile ? 'Saving Changes...' : 'Save Profile Details'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Change Password Form */}
+          <div className="card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.375rem' }}>
+              <Key size={18} color="#4f46e5" />
+              <h2 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#0f172a' }}>
+                Change Password
+              </h2>
+            </div>
+            <p style={{ fontSize: '0.8125rem', color: '#64748b', marginBottom: '1.25rem' }}>
+              Provide your current password to set a new secure password.
+            </p>
+
+            <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label className="input-label">Current Password</label>
+                <input
+                  type="password"
+                  required
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="input-field"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label className="input-label">New Password</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="input-field"
+                    placeholder="Min 6 characters"
+                  />
+                </div>
+                <div>
+                  <label className="input-label">Confirm New Password</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="input-field"
+                    placeholder="Repeat new password"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  type="submit"
+                  disabled={savingPassword}
+                  className="btn btn-secondary"
+                >
+                  <Key size={16} />
+                  <span>{savingPassword ? 'Updating Password...' : 'Update Password'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

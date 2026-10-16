@@ -23,6 +23,8 @@ export const OrganiserDashboard: React.FC = () => {
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [sessionScope, setSessionScope] = useState<'ALL' | 'ACTIVE' | 'CLOSED'>('ALL');
+  const [wsStatus, setWsStatus] = useState<'connected' | 'connecting' | 'disconnected'>('disconnected');
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -56,9 +58,9 @@ export const OrganiserDashboard: React.FC = () => {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const [c, activeList] = await Promise.all([
+      const [c, allSessions] = await Promise.all([
         api.getCourses(),
-        api.getActiveSessions()
+        api.getSessions()
       ]);
 
       setCourses(c);
@@ -66,9 +68,17 @@ export const OrganiserDashboard: React.FC = () => {
         setNewCourseId(c[0].id);
       }
 
-      setSessions(activeList);
-      if (activeList.length > 0 && !activeSession) {
-        selectSession(activeList[0]);
+      setSessions(allSessions);
+
+      // State recovery: restore previous session or first active session
+      const savedSessionId = localStorage.getItem('proxyproof_selected_session_id');
+      const targetSession =
+        (savedSessionId && allSessions.find((s) => s.id === Number(savedSessionId))) ||
+        allSessions.find((s) => s.is_active && !s.is_closed) ||
+        (allSessions.length > 0 ? allSessions[0] : null);
+
+      if (targetSession) {
+        selectSession(targetSession);
       }
     } catch (err: any) {
       showToast('error', err.message || 'Error loading organiser console');
@@ -83,6 +93,7 @@ export const OrganiserDashboard: React.FC = () => {
 
   const selectSession = async (session: AttendanceSession) => {
     setActiveSession(session);
+    localStorage.setItem('proxyproof_selected_session_id', String(session.id));
     try {
       const records = await api.getSessionAttendance(session.id);
       setAttendanceRecords(records);
@@ -98,14 +109,30 @@ export const OrganiserDashboard: React.FC = () => {
     }
   };
 
-  // Live WebSocket Connection
+  // Live WebSocket Connection with Status Tracking
   useEffect(() => {
-    if (!activeSession) return;
+    if (!activeSession) {
+      setWsStatus('disconnected');
+      return;
+    }
 
+    setWsStatus('connecting');
     const token = localStorage.getItem('proxyproof_token');
     const wsUrl = `${WS_BASE_URL}/ws/sessions/${activeSession.id}${token ? `?token=${token}` : ''}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
+
+    ws.onopen = () => {
+      setWsStatus('connected');
+    };
+
+    ws.onclose = () => {
+      setWsStatus('disconnected');
+    };
+
+    ws.onerror = () => {
+      setWsStatus('disconnected');
+    };
 
     ws.onmessage = (event) => {
       try {
@@ -127,8 +154,26 @@ export const OrganiserDashboard: React.FC = () => {
 
     return () => {
       ws.close();
+      setWsStatus('disconnected');
     };
   }, [activeSession?.id]);
+
+  // Fallback Polling (Every 5 seconds if WebSocket is not connected and session is live)
+  useEffect(() => {
+    if (!activeSession || !activeSession.is_active || activeSession.is_closed) return;
+    if (wsStatus === 'connected') return;
+
+    const fallbackTimer = setInterval(async () => {
+      try {
+        const records = await api.getSessionAttendance(activeSession.id);
+        setAttendanceRecords(records);
+      } catch (err) {
+        // Silent poll error
+      }
+    }, 5000);
+
+    return () => clearInterval(fallbackTimer);
+  }, [activeSession?.id, activeSession?.is_active, activeSession?.is_closed, wsStatus]);
 
   // Periodic Token & Countdown Polling
   useEffect(() => {
@@ -286,6 +331,13 @@ export const OrganiserDashboard: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Filter sessions by scope (All / Active / Closed)
+  const filteredSessions = sessions.filter((s) => {
+    if (sessionScope === 'ACTIVE') return s.is_active && !s.is_closed;
+    if (sessionScope === 'CLOSED') return s.is_closed;
+    return true;
+  });
+
   return (
     <div className="container" style={{ paddingTop: '2rem', paddingBottom: '4rem' }}>
       
@@ -347,17 +399,79 @@ export const OrganiserDashboard: React.FC = () => {
                 Attendance Sessions
               </h2>
               <span className="badge badge-revoked" style={{ fontSize: '0.625rem' }}>
-                {sessions.length} TOTAL
+                {filteredSessions.length} / {sessions.length} TOTAL
               </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}>
-              {sessions.length === 0 ? (
+            {/* Scope Filter Pills */}
+            <div style={{ display: 'flex', gap: '0.375rem', marginBottom: '0.875rem', background: '#f1f5f9', padding: '0.25rem', borderRadius: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={() => setSessionScope('ALL')}
+                style={{
+                  flex: 1,
+                  padding: '0.3rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  border: 'none',
+                  background: sessionScope === 'ALL' ? '#ffffff' : 'transparent',
+                  color: sessionScope === 'ALL' ? '#0f172a' : '#64748b',
+                  boxShadow: sessionScope === 'ALL' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                All ({sessions.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSessionScope('ACTIVE')}
+                style={{
+                  flex: 1,
+                  padding: '0.3rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  border: 'none',
+                  background: sessionScope === 'ACTIVE' ? '#ffffff' : 'transparent',
+                  color: sessionScope === 'ACTIVE' ? '#059669' : '#64748b',
+                  boxShadow: sessionScope === 'ACTIVE' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                Active ({sessions.filter((s) => s.is_active && !s.is_closed).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSessionScope('CLOSED')}
+                style={{
+                  flex: 1,
+                  padding: '0.3rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  border: 'none',
+                  background: sessionScope === 'CLOSED' ? '#ffffff' : 'transparent',
+                  color: sessionScope === 'CLOSED' ? '#4f46e5' : '#64748b',
+                  boxShadow: sessionScope === 'CLOSED' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                Past ({sessions.filter((s) => s.is_closed).length})
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '240px', overflowY: 'auto' }}>
+              {filteredSessions.length === 0 ? (
                 <div style={{ color: '#64748b', fontSize: '0.8125rem', textAlign: 'center', padding: '1.5rem 1rem' }}>
-                  No sessions found. Click <strong>Create Session</strong> to start.
+                  {sessionScope === 'ACTIVE'
+                    ? 'No active sessions running. Start one from the list or click Create Session.'
+                    : sessionScope === 'CLOSED'
+                    ? 'No closed sessions on record.'
+                    : 'No sessions found. Click Create Session to start.'}
                 </div>
               ) : (
-                sessions.map((s) => (
+                filteredSessions.map((s) => (
                   <button
                     key={s.id}
                     onClick={() => selectSession(s)}
@@ -517,9 +631,33 @@ export const OrganiserDashboard: React.FC = () => {
             {/* Table Header & Controls */}
             <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div>
-                <h2 style={{ fontSize: '1.0625rem', fontWeight: 700, color: '#0f172a' }}>
-                  {activeSession ? `${activeSession.title} — Attendee Roster` : 'Live Attendance Feed'}
-                </h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexWrap: 'wrap' }}>
+                  <h2 style={{ fontSize: '1.0625rem', fontWeight: 700, color: '#0f172a' }}>
+                    {activeSession ? `${activeSession.title} — Attendee Roster` : 'Live Attendance Feed'}
+                  </h2>
+                  {activeSession && (
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.375rem',
+                      padding: '0.15rem 0.5rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.6875rem',
+                      fontWeight: 600,
+                      background: wsStatus === 'connected' ? '#ecfdf5' : wsStatus === 'connecting' ? '#fffbeb' : '#f1f5f9',
+                      color: wsStatus === 'connected' ? '#047857' : wsStatus === 'connecting' ? '#b45309' : '#64748b',
+                      border: wsStatus === 'connected' ? '1px solid #a7f3d0' : wsStatus === 'connecting' ? '1px solid #fde68a' : '1px solid #e2e8f0'
+                    }}>
+                      <span style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: wsStatus === 'connected' ? '#10b981' : wsStatus === 'connecting' ? '#f59e0b' : '#94a3b8'
+                      }} />
+                      <span>{wsStatus === 'connected' ? 'Live Stream' : wsStatus === 'connecting' ? 'Connecting...' : 'Polling Fallback'}</span>
+                    </div>
+                  )}
+                </div>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.125rem' }}>
                   {activeSession ? `${activeSession.attendance_count} students verified of ${activeSession.enrolled_count} enrolled` : 'Select a session'}
                 </div>

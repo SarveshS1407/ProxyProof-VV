@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User, StudentProfile, UserRole
 from app.models.audit import AuditLog
-from app.schemas.auth import UserRegister, UserLogin, UserOut, Token
+from app.schemas.auth import UserRegister, UserLogin, UserOut, Token, UserProfileUpdate
 from app.core.security import hash_password, verify_password, create_access_token
 from app.core.deps import get_current_user
 
@@ -107,3 +107,56 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserOut)
 def read_current_user(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.put("/profile", response_model=UserOut)
+def update_profile(
+    profile_in: UserProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    details_changes = []
+
+    # Password update
+    if profile_in.new_password:
+        if not profile_in.current_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is required to set a new password"
+            )
+        if not verify_password(profile_in.current_password, current_user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is incorrect"
+            )
+        current_user.hashed_password = hash_password(profile_in.new_password)
+        details_changes.append("password changed")
+
+    # Name update
+    if profile_in.full_name and profile_in.full_name.strip():
+        current_user.full_name = profile_in.full_name.strip()
+        details_changes.append("name updated")
+
+    # Student Profile update (department / batch)
+    if current_user.student_profile:
+        if profile_in.department is not None:
+            current_user.student_profile.department = profile_in.department.strip()
+            details_changes.append("department updated")
+        if profile_in.batch is not None:
+            current_user.student_profile.batch = profile_in.batch.strip()
+            details_changes.append("batch updated")
+
+    if details_changes:
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="USER_PROFILE_UPDATED",
+            entity_type="User",
+            entity_id=current_user.id,
+            details=f"User {current_user.email} updated profile: {', '.join(details_changes)}"
+        )
+        db.add(audit)
+        db.commit()
+        db.refresh(current_user)
+
+    return current_user
+

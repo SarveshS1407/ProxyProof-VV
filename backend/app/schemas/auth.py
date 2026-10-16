@@ -45,3 +45,12 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserOut
+
+
+class UserProfileUpdate(BaseModel):
+    full_name: Optional[str] = Field(None, min_length=2)
+    current_password: Optional[str] = None
+    new_password: Optional[str] = Field(None, min_length=6)
+    department: Optional[str] = None
+    batch: Optional[str] = None
+

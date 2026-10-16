@@ -12,6 +12,7 @@ from app.schemas.device import (
     DeviceChangeRequestOut, DeviceChangeReview
 )
 from app.core.deps import get_current_user, get_current_student, get_current_admin
+from app.core.crypto import validate_public_key
 
 router = APIRouter(prefix="/devices", tags=["Device Management"])
 
@@ -22,6 +23,12 @@ def register_device(
     current_user: User = Depends(get_current_student),
     db: Session = Depends(get_db)
 ):
+    # Validate cryptographic public key format
+    if not validate_public_key(device_in.public_key):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid public key format. Must be a valid 32-byte Ed25519 key (hex/base64) or ECDSA P-256 public key."
+        )
     profile = db.query(StudentProfile).filter(StudentProfile.user_id == current_user.id).first()
     if not profile:
         raise HTTPException(
@@ -99,6 +106,12 @@ def request_device_change(
     current_user: User = Depends(get_current_student),
     db: Session = Depends(get_db)
 ):
+    if not validate_public_key(req_in.new_public_key):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid new public key format. Must be a valid 32-byte Ed25519 key (hex/base64) or ECDSA P-256 public key."
+        )
+
     profile = db.query(StudentProfile).filter(StudentProfile.user_id == current_user.id).first()
     if not profile:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Student profile not found")

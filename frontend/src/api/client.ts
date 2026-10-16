@@ -1,6 +1,7 @@
 import {
   User, Course, AttendanceSession, SessionTokenInfo, AttendanceRecord,
-  Device, DeviceChangeRequest, StudentReport, AdminStats, AuditLogItem
+  Device, DeviceChangeRequest, StudentReport, AdminStats, AuditLogItem,
+  UserProfileUpdateData, AttendanceInvestigationItem
 } from '../types';
 
 const envApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -62,6 +63,16 @@ export const api = {
     });
     return handleResponse(res);
   },
+
+  async updateProfile(data: UserProfileUpdateData): Promise<User> {
+    const res = await fetch(`${API_BASE_URL}/auth/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify(data),
+    });
+    return handleResponse(res);
+  },
+
 
   // Devices
   async getDeviceStatus(): Promise<Device[]> {
@@ -155,6 +166,18 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
       body: JSON.stringify(data),
+    });
+    return handleResponse(res);
+  },
+
+  async getSessions(courseId?: number, isClosed?: boolean, isActive?: boolean): Promise<AttendanceSession[]> {
+    const params = new URLSearchParams();
+    if (courseId !== undefined) params.append('course_id', String(courseId));
+    if (isClosed !== undefined) params.append('is_closed', String(isClosed));
+    if (isActive !== undefined) params.append('is_active', String(isActive));
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${API_BASE_URL}/sessions/${qs}`, {
+      headers: { ...getAuthHeader() },
     });
     return handleResponse(res);
   },
@@ -287,4 +310,44 @@ export const api = {
     });
     return handleResponse(res);
   },
+
+  async updateUserRole(userId: number, role: string): Promise<User> {
+    const res = await fetch(`${API_BASE_URL}/admin/users/${userId}/role`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify({ role }),
+    });
+    return handleResponse(res);
+  },
+
+  async revokeDevice(deviceId: number): Promise<{ message: string; device_id: number; status: string }> {
+    const res = await fetch(`${API_BASE_URL}/admin/devices/${deviceId}/revoke`, {
+      method: 'POST',
+      headers: { ...getAuthHeader() },
+    });
+    return handleResponse(res);
+  },
+
+  async investigateAttendance(params?: {
+    session_id?: number;
+    student_id?: number;
+    status?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AttendanceInvestigationItem[]> {
+    const urlParams = new URLSearchParams();
+    if (params?.session_id !== undefined) urlParams.append('session_id', String(params.session_id));
+    if (params?.student_id !== undefined) urlParams.append('student_id', String(params.student_id));
+    if (params?.status) urlParams.append('status', params.status);
+    if (params?.search) urlParams.append('search', params.search);
+    if (params?.limit !== undefined) urlParams.append('limit', String(params.limit));
+    if (params?.offset !== undefined) urlParams.append('offset', String(params.offset));
+    const qs = urlParams.toString() ? `?${urlParams.toString()}` : '';
+    const res = await fetch(`${API_BASE_URL}/admin/attendance/investigate${qs}`, {
+      headers: { ...getAuthHeader() },
+    });
+    return handleResponse(res);
+  },
 };
+

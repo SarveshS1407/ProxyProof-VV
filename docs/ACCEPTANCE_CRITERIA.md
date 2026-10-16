@@ -30,6 +30,15 @@ This document defines the formal, individually testable acceptance criteria for 
 - **When** the JWT role does not match the required authorization level,
 - **Then** the server must reject the request with `403 Forbidden`. The frontend must never be the sole mechanism for role gating.
 
+### AC-AUTH-04: User Profile Updates & Password Security
+- **Given** an authenticated user submitting `PUT /api/v1/auth/profile`,
+- **When** updating profile attributes (`full_name`, `department`, `batch`):
+  1. Profile attributes must persist and reflect immediately on subsequent `/auth/me` calls.
+- **And** when requesting a password update:
+  1. `current_password` must be verified against the user's existing bcrypt hash (`400 Bad Request` if incorrect).
+  2. `new_password` must meet minimum length requirements ($\ge 6$ chars) and be hashed with bcrypt.
+  3. A `USER_PROFILE_UPDATED` entry must be logged to the immutable audit trail.
+
 ---
 
 ## 2. Student Device Binding & Device Lifecycle
@@ -63,6 +72,16 @@ This document defines the formal, individually testable acceptance criteria for 
   2. The new device must be registered and set to `APPROVED`.
   3. The request status must transition to `APPROVED`.
   4. An audit log entry must record the reviewing admin's ID, timestamp, and notes.
+
+### AC-DEV-05: Direct Hardware Device Revocation
+- **Given** an authenticated administrator,
+- **When** calling `POST /api/v1/admin/devices/{device_id}/revoke`,
+- **Then** the device status must transition to `REVOKED`, immediately invalidating subsequent digital attendance claims signed by that device, and logging a `DEVICE_REVOKED_BY_ADMIN` audit event.
+
+### AC-DEV-06: Cryptographic Public Key Format Validation
+- **Given** a device registration or replacement request,
+- **When** the `public_key` string is submitted,
+- **Then** the backend must validate that the key conforms to a valid 32-byte Ed25519 key (hex/base64), SPKI ECDSA P-256 PEM, or 65-byte SEC1 uncompressed point. Malformed public keys must be rejected with `400 Bad Request`.
 
 ---
 
@@ -143,6 +162,13 @@ This document defines the formal, individually testable acceptance criteria for 
   3. Create an immutable `AuditLog` entry.
   4. Broadcast the update over WebSocket to connected clients.
 
+### AC-SESS-02: Organiser Ownership Authorization & Session Querying
+- **Given** an authenticated organiser,
+- **When** querying sessions via `GET /api/v1/sessions/`:
+  1. Organisers can list both active and concluded/closed sessions for their managed courses.
+  2. Organisers can only access attendee rosters, perform manual corrections, or export CSVs for sessions they created (`403 Forbidden` if another organiser attempts access).
+  3. System administrators have global access across all sessions.
+
 ---
 
 ## 6. Course & Student Enrollment Management
@@ -219,3 +245,22 @@ This document defines the formal, individually testable acceptance criteria for 
 ### AC-DEP-03: Environment Variable Configuration
 - **Given** frontend and backend deployments across staging and production,
 - **Then** the frontend must read API and WebSocket URLs from `VITE_API_URL` and `VITE_WS_URL` rather than hardcoded localhost strings.
+
+---
+
+## 11. Administrator Governance & Forensic Investigation
+
+### AC-ADMIN-01: Administrative User Role Management
+- **Given** an authenticated administrator,
+- **When** calling `PUT /api/v1/admin/users/{user_id}/role` with new role (`student`, `organiser`, `admin`):
+  1. The system must prevent administrators from modifying their own role (`400 Bad Request`).
+  2. If transitioning a user to `student`, the system must automatically provision a corresponding `StudentProfile` record if one does not exist.
+  3. A `USER_ROLE_UPDATED` entry must be recorded in the audit trail.
+  4. The updated user profile must be returned with `200 OK`.
+
+### AC-ADMIN-02: Forensic Attendance Investigation & Proof Inspection
+- **Given** an administrator investigating attendance validity via `GET /api/v1/admin/attendance/investigate`,
+- **When** filtering by session, student, status, or search query:
+  1. The endpoint must return structured records including course, session, student, status, RSSI, nonce, timestamp, manual override details, bound device model, device identifier, and registered hardware public key.
+  2. Text search must match across student names, emails, roll numbers, course codes, session titles, device identifiers, and challenge nonces.
+  3. Administrators must be able to inspect cryptographic proof metadata directly from the console and trigger hardware device revocation if suspicious activity is detected.

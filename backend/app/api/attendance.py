@@ -203,6 +203,12 @@ def get_session_attendance(
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
+    if current_user.role == UserRole.ORGANISER and session.organiser_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to view attendance records for another organiser's session"
+        )
+
     records = db.query(AttendanceRecord).filter(
         AttendanceRecord.session_id == session_id
     ).order_by(AttendanceRecord.recorded_at.desc()).all()
@@ -237,6 +243,12 @@ async def manual_attendance_override(
     session = db.query(AttendanceSession).filter(AttendanceSession.id == override_in.session_id).first()
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    if current_user.role == UserRole.ORGANISER and session.organiser_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to modify attendance records for another organiser's session"
+        )
 
     student = db.query(User).filter(User.id == override_in.student_id).first()
     if not student or student.role != UserRole.STUDENT:
@@ -456,6 +468,12 @@ def export_session_csv(
     session = db.query(AttendanceSession).filter(AttendanceSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    if current_user.role == UserRole.ORGANISER and session.organiser_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to export attendance records for another organiser's session"
+        )
 
     records = db.query(AttendanceRecord).filter(
         AttendanceRecord.session_id == session_id

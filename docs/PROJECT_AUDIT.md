@@ -194,11 +194,18 @@ ProxyProof Multi-Tier Architecture
 - [x] Add auto-reconnection logic and connection status indicator to WebSockets in `OrganiserDashboard.tsx`.
 - [x] Redesign visual system across Student, Organiser, Admin, Login, and Register pages with custom responsive CSS.
 
-### Phase 2: Security & Edge Case Hardening
-- [ ] Validate device public key format upon registration in backend.
-- [ ] Filter unstarted/draft sessions out of attendance percentage denominator.
-- [ ] Mount in-memory or Redis-based rate limiting on sensitive `/auth/login` and `/attendance/submit` endpoints.
-- [ ] Add refresh tokens and revocation blacklisting for JWTs.
+### Phase 2: Security, Backend Integration & Functional Completion (Completed)
+- [x] Validate device public key format upon registration in backend (Ed25519, SPKI ECDSA P-256, and SEC1 uncompressed points).
+- [x] Filter unstarted/draft sessions out of attendance percentage denominator.
+- [x] Add user profile update and password change endpoint (`PUT /api/v1/auth/profile`) with current password verification and audit logs.
+- [x] Add user role modification endpoint (`PUT /api/v1/admin/users/{user_id}/role`) with self-modification guard and automatic `StudentProfile` provisioning.
+- [x] Add direct hardware device revocation endpoint (`POST /api/v1/admin/devices/{device_id}/revoke`).
+- [x] Add forensic attendance investigation endpoint (`GET /api/v1/admin/attendance/investigate`) with search, filter, and cryptographic metadata.
+- [x] Add session history querying endpoint (`GET /api/v1/sessions/`) with organiser ownership checks.
+- [x] Implement strict organiser ownership gating across session attendance, manual overrides, and CSV reports (`403 Forbidden` on unauthorized access).
+- [x] Add Student Profile & Password edit UI with tab persistence and contextual error guidance.
+- [x] Add Organiser session history scope toggle, dashboard state recovery, WebSocket heartbeat status badge, and fallback polling.
+- [x] Add Admin User Role management modal, direct device revocation, and Attendance Investigation tab with Cryptographic Proof inspector.
 
 ### Phase 3: Mobile Native Build Alignment
 - [ ] Add `react-native-ble-plx` to `mobile/package.json` dependencies.
@@ -207,7 +214,7 @@ ProxyProof Multi-Tier Architecture
 
 ---
 
-## 9. Phase 1 — UI/UX Redesign Implementation Summary
+## 9. Phase 1 & Phase 2 Implementation Summary
 
 ### 9.1 Visual System & Design Architecture
 * **Design System Foundation:** Implemented in `frontend/src/index.css` using CSS custom properties for maintainability without heavy external framework bloat.
@@ -223,7 +230,7 @@ ProxyProof Multi-Tier Architecture
    * Supports `success`, `error`, and `info` with icons, auto-dismiss (4.5s), and manual close triggers.
 2. **`ConfirmModal` (`frontend/src/components/common/ConfirmModal.tsx`):**
    * Accessible dialog with focus trapping and keyboard navigation (`Escape` to dismiss, `Enter` to confirm).
-   * Supports `danger`, `warning`, and `primary` actions with explanatory warning callouts for destructive actions (e.g., closing sessions, suspending users).
+   * Supports `danger`, `warning`, and `primary` actions with explanatory warning callouts for destructive actions (e.g., closing sessions, suspending users, changing roles).
 3. **`StatusPill` (`frontend/src/components/common/StatusPill.tsx`):**
    * Standardized status pills for attendance records (`PRESENT`, `LATE`, `EXCUSED`, `ABSENT`), device requests (`PENDING`, `APPROVED`, `REJECTED`, `REVOKED`), and user accounts (`ACTIVE`, `SUSPENDED`).
 4. **`SignalMeter` (`frontend/src/components/common/SignalMeter.tsx`):**
@@ -231,28 +238,33 @@ ProxyProof Multi-Tier Architecture
 5. **`EmptyState` (`frontend/src/components/common/EmptyState.tsx`):**
    * Clean illustrations for empty tables, search filters with zero matches, or uninitiated states.
 
-### 9.3 Role Experience Upgrades
+### 9.3 Role Experience & Functional Upgrades
 * **Student Experience (`StudentPortal.tsx`):**
-  * 4 sub-views: `Live Check-In`, `My Courses & Stats`, `Registered Device`, and `Account Profile`.
-  * Real cryptographic keypair generation using standard W3C WebCrypto (ECDSA P-256) stored in client storage.
-  * Signal proximity simulation with distance meter and real-time RSSI calculation.
-  * Multi-stage verification UI: Searching $\to$ Beacon Detected $\to$ Challenge Signing $\to$ Attendance Confirmed.
-  * Course-wise percentage progress bars with warning highlights when attendance drops below $75\%$.
+   * 4 functional sub-views: `Live BLE Check-In`, `My Courses & Stats`, `Registered Device`, and `Account Profile`.
+   * Real cryptographic keypair generation using standard W3C WebCrypto (ECDSA P-256) stored securely in client storage.
+   * Signal proximity simulation with distance meter and real-time RSSI calculation.
+   * Multi-stage verification UI: Searching $\to$ Beacon Detected $\to$ Challenge Signing $\to$ Attendance Confirmed.
+   * Course-wise percentage progress bars with warning highlights when attendance drops below $75\%$.
+   * User profile attribute editing and password modification with current password verification.
+   * Contextual verification error troubleshooting guidance with retry action.
 * **Organiser Experience (`OrganiserDashboard.tsx`):**
-  * Live token rotation countdown with animated circular progress indicator.
-  * Real-time attendance roster connected to WebSocket stream with search filter and status filter.
-  * One-click CSV report export with Bearer token authentication.
-  * Accessible modals for creating courses, enrolling students, and confirming session closure.
+   * Live token rotation countdown with animated progress bar and remaining seconds.
+   * Active and past session browsing (`All`, `Active`, `Past` filters) with dashboard state recovery on reload.
+   * Real-time attendance roster connected to WebSocket stream with live stream status badge (`Live Stream`, `Connecting...`, `Polling Fallback`).
+   * Fallback periodic REST polling if WebSockets are temporarily disconnected.
+   * Strict server-side ownership authorization: Organisers can only access, override, or export CSVs for their own sessions.
+   * Accessible modals for creating courses, enrolling students, manual attendance corrections, and confirming session closure.
 * **Administrator Experience (`AdminPortal.tsx`):**
-  * System overview metric cards for Users, Active Sessions, Verified Records, and Pending Device Requests.
-  * 3 tabs with search and filters: Device Replacement Requests, User Accounts, and Security Audit Trail.
-  * Device review modal requiring admin notes for rejections.
-  * Account suspension/activation with confirm modal detailing security implications.
+   * System overview metric cards for Users, Active Sessions, Verified Records, and Pending Device Requests.
+   * 4 tabs: Device Replacement Requests, User Accounts, Attendance Investigation, and Security Audit Trail.
+   * User role management with confirmation modal, preventing self-role alteration.
+   * Direct hardware device credential revocation.
+   * Forensic attendance investigation table with student/session/status filtering and cryptographic proof inspection modal.
 * **Authentication Experience (`Login.tsx` & `Register.tsx`):**
-  * Password visibility toggles, clear input labels with `htmlFor`, and role selection cards.
-  * One-click demo switcher with visual role identifiers for rapid multi-role evaluation.
+   * Password visibility toggles, clear input labels with `htmlFor`, and role selection cards.
+   * One-click demo switcher with visual role identifiers for rapid multi-role evaluation.
 
 ### 9.4 Verification Results
-* **Frontend Production Build:** `npm run build` $\to$ Exit code `0` (1511 modules transformed, 0 errors, built in 1.05s).
-* **Backend Automated Suite:** `pytest` $\to$ Exit code `0` (26 passed, 100% pass rate in 8.35s).
+* **Frontend Production Build:** `npm run build` $\to$ Exit code `0` (1511 modules transformed, 0 errors, built in 1.10s).
+* **Backend Automated Suite:** `pytest` $\to$ Exit code `0` (36 passed, 0 failures, 100% pass rate in 13.43s).
 

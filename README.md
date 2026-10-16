@@ -142,12 +142,12 @@ cd backend
 python -m pytest app/tests -v
 ```
 
-### Verified Test Results:
-* `test_admin.py` — Admin metrics, audit log inspection, and role authorization.
-* `test_attendance.py` — End-to-end check-in, duplicate prevention (409 Conflict), weak signal rejection, expired token rejection, and sanitized CSV generation.
-* `test_auth.py` — Registration, duplicate checking, password hashing, and token issuing.
-* `test_crypto.py` — Asymmetric keypair generation, signature verification, and payload tampering detection.
-* `test_device.py` — Single-device binding, duplicate hardware rejection, and device replacement approval workflow.
+### Verified Test Results (36 Passed, 100% Pass Rate):
+* `test_admin.py` — Admin metrics, audit log inspection, user role updates, direct device revocation, and forensic attendance investigation filters.
+* `test_attendance.py` — End-to-end check-in, duplicate prevention (409 Conflict), weak signal rejection, expired token rejection, cross-organiser ownership isolation (403 Forbidden), manual overrides, and sanitized CSV generation.
+* `test_auth.py` — Registration, duplicate checking, password hashing, token issuing, profile attribute updates, and password changes with current password verification.
+* `test_crypto.py` — Asymmetric keypair generation, signature verification (Ed25519 & ECDSA P-256), payload tampering detection, and public key format validation.
+* `test_device.py` — Single-device binding, public key validation (Ed25519, SPKI PEM, SEC1 points), duplicate hardware rejection, and device replacement approval workflow.
 * `test_reports.py` — Attendance percentages, excused session handling, and division-by-zero safety.
 
 ---

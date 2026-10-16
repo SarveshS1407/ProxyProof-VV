@@ -159,3 +159,36 @@ export interface AuditLogItem {
   details?: string;
   timestamp: string;
 }
+
+export interface UserProfileUpdateData {
+  full_name?: string;
+  current_password?: string;
+  new_password?: string;
+  department?: string;
+  batch?: string;
+}
+
+export interface AttendanceInvestigationItem {
+  id: number;
+  session_id: number;
+  session_title: string;
+  course_id: number;
+  course_code: string;
+  course_title: string;
+  student_id: number;
+  student_name: string;
+  student_email: string;
+  student_id_number: string;
+  device_id?: number;
+  device_identifier?: string;
+  device_model?: string;
+  device_public_key?: string;
+  status: string;
+  verification_method: string;
+  rssi?: number;
+  nonce?: string;
+  recorded_at: string;
+  manual_override: boolean;
+  override_reason?: string;
+}
+

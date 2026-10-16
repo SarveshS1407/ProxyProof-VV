@@ -1,7 +1,7 @@
 import time
 from datetime import datetime, timezone, timedelta
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -84,6 +84,56 @@ def create_session(
         attendance_count=0,
         enrolled_count=enrolled
     )
+
+
+@router.get("/", response_model=List[SessionOut])
+def list_sessions(
+    course_id: Optional[int] = Query(None),
+    is_closed: Optional[bool] = Query(None),
+    is_active: Optional[bool] = Query(None),
+    current_user: User = Depends(get_current_organiser),
+    db: Session = Depends(get_db)
+):
+    query = db.query(AttendanceSession)
+    if current_user.role == UserRole.ORGANISER:
+        query = query.filter(AttendanceSession.organiser_id == current_user.id)
+    if course_id is not None:
+        query = query.filter(AttendanceSession.course_id == course_id)
+    if is_closed is not None:
+        query = query.filter(AttendanceSession.is_closed == is_closed)
+    if is_active is not None:
+        query = query.filter(AttendanceSession.is_active == is_active)
+
+    sessions = query.order_by(AttendanceSession.created_at.desc()).all()
+    results = []
+    for s in sessions:
+        enrolled = db.query(CourseEnrollment).filter(
+            CourseEnrollment.course_id == s.course_id,
+            CourseEnrollment.is_active == True
+        ).count()
+        attended = db.query(AttendanceRecord).filter(
+            AttendanceRecord.session_id == s.id
+        ).count()
+        results.append(SessionOut(
+            id=s.id,
+            course_id=s.course_id,
+            course_title=s.course.title if s.course else None,
+            course_code=s.course.code if s.course else None,
+            organiser_id=s.organiser_id,
+            title=s.title,
+            location=s.location,
+            start_time=s.start_time,
+            end_time=s.end_time,
+            duration_minutes=s.duration_minutes,
+            is_active=s.is_active,
+            is_closed=s.is_closed,
+            token_rotation_seconds=s.token_rotation_seconds,
+            min_rssi=s.min_rssi,
+            created_at=s.created_at,
+            attendance_count=attended,
+            enrolled_count=enrolled
+        ))
+    return results
 
 
 @router.get("/active", response_model=List[SessionOut])

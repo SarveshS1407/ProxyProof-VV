@@ -82,4 +82,73 @@ def verify_device_signature(public_key_str: str, message: str, signature_str: st
         except Exception:
             return False
 
+    # 4. Try raw uncompressed EC SECP256R1 public key (65 bytes)
+    if pub_bytes and len(pub_bytes) == 65 and pub_bytes[0] == 4:
+        try:
+            ec_pub = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), pub_bytes)
+            test_sig = sig_bytes
+            if len(sig_bytes) == 64:
+                try:
+                    r = int.from_bytes(sig_bytes[:32], byteorder="big")
+                    s = int.from_bytes(sig_bytes[32:], byteorder="big")
+                    test_sig = utils.encode_dss_signature(r, s)
+                except Exception:
+                    test_sig = sig_bytes
+            ec_pub.verify(test_sig, msg_bytes, ec.ECDSA(hashes.SHA256()))
+            return True
+        except Exception:
+            return False
+
     return False
+
+
+def validate_public_key(public_key_str: str) -> bool:
+    """
+    Validates whether 'public_key_str' is a valid cryptographic public key.
+    Supported formats:
+    - 32-byte Ed25519 raw public key (64 hex characters or base64)
+    - X.509 SubjectPublicKeyInfo PEM string (Ed25519 or ECDSA P-256)
+    - 65-byte uncompressed EC SECP256R1 point (130 hex characters)
+    """
+    if not public_key_str or not isinstance(public_key_str, str):
+        return False
+    
+    clean = public_key_str.strip()
+    if not clean:
+        return False
+
+    # Check 1: PEM format
+    if "BEGIN PUBLIC KEY" in clean:
+        try:
+            key = load_pem_public_key(clean.encode("utf-8"))
+            if isinstance(key, (ed25519.Ed25519PublicKey, ec.EllipticCurvePublicKey)):
+                return True
+        except Exception:
+            return False
+
+    # Check 2: Raw bytes (hex)
+    try:
+        raw_bytes = bytes.fromhex(clean)
+        if len(raw_bytes) == 32:
+            ed25519.Ed25519PublicKey.from_public_bytes(raw_bytes)
+            return True
+        elif len(raw_bytes) == 65 and raw_bytes[0] == 4:
+            ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), raw_bytes)
+            return True
+    except Exception:
+        pass
+
+    # Check 3: Base64 raw bytes
+    try:
+        raw_bytes = base64.b64decode(clean)
+        if len(raw_bytes) == 32:
+            ed25519.Ed25519PublicKey.from_public_bytes(raw_bytes)
+            return True
+        elif len(raw_bytes) == 65 and raw_bytes[0] == 4:
+            ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), raw_bytes)
+            return True
+    except Exception:
+        pass
+
+    return False
+

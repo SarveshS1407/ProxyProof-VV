@@ -182,3 +182,49 @@ def test_manual_attendance_override_and_csv_export(
     csv_text = csv_res.text
     assert "Doctor appointment verified" in csv_text
     assert "EXCUSED" in csv_text
+
+
+def test_list_sessions_filter_and_history(client, organiser_headers, enrolled_course_fixture):
+    # Organiser lists their sessions
+    res = client.get(f"/api/v1/sessions/?course_id={enrolled_course_fixture.id}", headers=organiser_headers)
+    assert res.status_code == 200
+    sessions = res.json()
+    assert isinstance(sessions, list)
+
+
+def test_other_organiser_forbidden_from_export_or_override(
+    client, db_session, organiser_headers, enrolled_course_fixture
+):
+    from app.models.user import User, UserRole
+    from app.core.security import hash_password, create_access_token
+
+    # Create session owned by first organiser
+    create_res = client.post("/api/v1/sessions/", headers=organiser_headers, json={
+        "course_id": enrolled_course_fixture.id,
+        "title": "Private Session",
+        "duration_minutes": 45
+    })
+    session_id = create_res.json()["id"]
+
+    # Create a second organiser
+    second_org = User(
+        email="second_prof@university.edu",
+        hashed_password=hash_password("Pass123!"),
+        full_name="Second Prof",
+        role=UserRole.ORGANISER,
+        is_active=True
+    )
+    db_session.add(second_org)
+    db_session.commit()
+    second_headers = {"Authorization": f"Bearer {create_access_token(second_org.id)}"}
+
+    # Second organiser cannot export CSV of first organiser's session
+    export_res = client.get(f"/api/v1/attendance/session/{session_id}/export-csv", headers=second_headers)
+    assert export_res.status_code == 403
+    assert "not authorized" in export_res.json()["detail"]
+
+    # Second organiser cannot view attendance roster of first organiser's session
+    roster_res = client.get(f"/api/v1/attendance/session/{session_id}", headers=second_headers)
+    assert roster_res.status_code == 403
+    assert "not authorized" in roster_res.json()["detail"]
+

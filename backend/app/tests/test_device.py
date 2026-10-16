@@ -58,3 +58,16 @@ def test_device_change_request_and_admin_approval(client, student_headers, admin
     statuses = {d["device_identifier"]: d["status"] for d in dev_status}
     assert statuses["device-uuid-test-1234"] == "REVOKED"
     assert statuses["iphone-16-pro-new"] == "APPROVED"
+
+
+def test_reject_invalid_public_key_format(client, student_headers):
+    # Attempt to request device change with malformed non-cryptographic key
+    res = client.post("/api/v1/devices/request-change", headers=student_headers, json={
+        "new_device_identifier": "fake-phone",
+        "new_public_key": "this_is_not_a_valid_cryptographic_key",
+        "new_device_model": "Fake",
+        "reason": "Testing key validation"
+    })
+    assert res.status_code == 400
+    assert "Invalid new public key format" in res.json()["detail"]
+

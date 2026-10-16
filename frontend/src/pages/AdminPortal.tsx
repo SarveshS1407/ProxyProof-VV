@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../api/client';
-import { AdminStats, DeviceChangeRequest, User, AuditLogItem, UserRole } from '../types';
+import { AdminStats, DeviceChangeRequest, User, AuditLogItem, UserRole, AttendanceInvestigationItem } from '../types';
 import { useToast } from '../context/ToastContext';
 import { ConfirmModal } from '../components/common/ConfirmModal';
 import { StatusPill } from '../components/common/StatusPill';
@@ -8,7 +8,8 @@ import { EmptyState } from '../components/common/EmptyState';
 import {
   Shield, Users, Smartphone, FileText, CheckCircle2, XCircle,
   AlertCircle, RefreshCw, Activity, Search, Filter, ShieldAlert,
-  UserCheck, GraduationCap, Check, AlertTriangle, Clock
+  UserCheck, GraduationCap, Check, AlertTriangle, Clock, Key,
+  Fingerprint, Compass, ShieldOff
 } from 'lucide-react';
 
 export const AdminPortal: React.FC = () => {
@@ -18,7 +19,7 @@ export const AdminPortal: React.FC = () => {
   const [requests, setRequests] = useState<DeviceChangeRequest[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
-  const [activeTab, setActiveTab] = useState<'requests' | 'users' | 'audit'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'users' | 'investigate' | 'audit'>('requests');
   const [loading, setLoading] = useState(false);
 
   // Filters & Search
@@ -31,6 +32,18 @@ export const AdminPortal: React.FC = () => {
 
   const [auditSearch, setAuditSearch] = useState('');
   const [auditActionFilter, setAuditActionFilter] = useState<string>('ALL');
+
+  // Role Change Modal State
+  const [roleChangeTarget, setRoleChangeTarget] = useState<{ user: User; newRole: UserRole } | null>(null);
+  const [changingRole, setChangingRole] = useState(false);
+
+  // Attendance Investigation State
+  const [investigationRecords, setInvestigationRecords] = useState<AttendanceInvestigationItem[]>([]);
+  const [investigationSearch, setInvestigationSearch] = useState('');
+  const [investigationStatus, setInvestigationStatus] = useState<string>('ALL');
+  const [loadingInvestigation, setLoadingInvestigation] = useState(false);
+  const [selectedProof, setSelectedProof] = useState<AttendanceInvestigationItem | null>(null);
+  const [revokingDeviceId, setRevokingDeviceId] = useState<number | null>(null);
 
   // Review Modal State
   const [reviewTarget, setReviewTarget] = useState<{
@@ -184,13 +197,75 @@ export const AdminPortal: React.FC = () => {
         `User ${userToggleTarget.full_name} (${userToggleTarget.email}) has been ${userToggleTarget.is_active ? 'suspended' : 'activated'}.`
       );
       setUserToggleTarget(null);
-      await fetchAdminData();
     } catch (e: any) {
       showToast('error', e.message || 'Error updating user status');
     } finally {
       setTogglingUser(false);
     }
   };
+
+  const handleConfirmRoleChange = async () => {
+    if (!roleChangeTarget) return;
+    try {
+      setChangingRole(true);
+      await api.updateUserRole(roleChangeTarget.user.id, roleChangeTarget.newRole);
+      showToast(
+        'success',
+        `Role for ${roleChangeTarget.user.full_name} updated to ${roleChangeTarget.newRole.toUpperCase()}.`
+      );
+      setRoleChangeTarget(null);
+      await fetchAdminData();
+    } catch (err: any) {
+      showToast('error', err.message || 'Error updating user role');
+    } finally {
+      setChangingRole(false);
+    }
+  };
+
+  const handleConfirmRevokeDevice = async (deviceId: number, studentName?: string) => {
+    try {
+      setRevokingDeviceId(deviceId);
+      await api.revokeDevice(deviceId);
+      showToast(
+        'success',
+        `Hardware device credentials successfully revoked${studentName ? ` for ${studentName}` : ''}.`
+      );
+      if (selectedProof && selectedProof.device_id === deviceId) {
+        setSelectedProof(null);
+      }
+      await fetchAdminData();
+      if (activeTab === 'investigate') {
+        await fetchInvestigationData();
+      }
+    } catch (err: any) {
+      showToast('error', err.message || 'Failed to revoke device credentials');
+    } finally {
+      setRevokingDeviceId(null);
+    }
+  };
+
+  const fetchInvestigationData = async () => {
+    try {
+      setLoadingInvestigation(true);
+      const results = await api.investigateAttendance({
+        search: investigationSearch.trim() || undefined,
+        status: investigationStatus !== 'ALL' ? investigationStatus : undefined,
+        limit: 50,
+        offset: 0
+      });
+      setInvestigationRecords(results);
+    } catch (err: any) {
+      showToast('error', `Error loading investigation records: ${err.message}`);
+    } finally {
+      setLoadingInvestigation(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'investigate') {
+      fetchInvestigationData();
+    }
+  }, [activeTab, investigationStatus]);
 
   const pendingRequestsCount = requests.filter((r) => r.status === 'PENDING').length;
 
@@ -341,6 +416,30 @@ export const AdminPortal: React.FC = () => {
         >
           <Users size={16} />
           <span>User Accounts ({users.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('investigate')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            fontWeight: 600,
+            fontSize: '0.875rem',
+            borderBottom: '2px solid',
+            borderColor: activeTab === 'investigate' ? 'var(--primary-600)' : 'transparent',
+            color: activeTab === 'investigate' ? 'var(--primary-600)' : 'var(--slate-500)',
+            background: 'none',
+            borderTop: 'none',
+            borderLeft: 'none',
+            borderRight: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          <Fingerprint size={16} />
+          <span>Attendance Investigation</span>
         </button>
 
         <button
@@ -636,11 +735,186 @@ export const AdminPortal: React.FC = () => {
                           <StatusPill status={u.is_active ? 'ACTIVE' : 'SUSPENDED'} size="sm" />
                         </td>
                         <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <select
+                              value={u.role}
+                              onChange={(e) => {
+                                const newRole = e.target.value as UserRole;
+                                if (newRole !== u.role) {
+                                  setRoleChangeTarget({ user: u, newRole });
+                                }
+                              }}
+                              className="input-field"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', width: 'auto' }}
+                              title="Modify system authorization role"
+                            >
+                              <option value="student">Student</option>
+                              <option value="organiser">Organiser</option>
+                              <option value="admin">Admin</option>
+                            </select>
+
+                            <button
+                              onClick={() => setUserToggleTarget(u)}
+                              className={`btn btn-sm ${u.is_active ? 'btn-secondary' : 'btn-primary'}`}
+                            >
+                              {u.is_active ? 'Suspend' : 'Activate'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* TAB 3: ATTENDANCE INVESTIGATION & CRYPTOGRAPHIC AUDIT */}
+      {activeTab === 'investigate' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          
+          {/* Controls: Search, Status Filter, Refresh */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', flex: 1, minWidth: '280px' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--slate-400)' }} />
+                <input
+                  type="text"
+                  placeholder="Search by student, roll number, course code, or session title..."
+                  value={investigationSearch}
+                  onChange={(e) => setInvestigationSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') fetchInvestigationData(); }}
+                  className="input-field"
+                  style={{ paddingLeft: '2.25rem' }}
+                />
+              </div>
+              <button onClick={fetchInvestigationData} className="btn btn-secondary btn-sm" disabled={loadingInvestigation}>
+                <Search size={14} />
+                <span>Search</span>
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <select
+                value={investigationStatus}
+                onChange={(e) => setInvestigationStatus(e.target.value)}
+                className="input-field"
+                style={{ width: 'auto', padding: '0.375rem 0.75rem', fontSize: '0.8125rem' }}
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="PRESENT">Present</option>
+                <option value="LATE">Late</option>
+                <option value="EXCUSED">Excused</option>
+                <option value="ABSENT">Absent</option>
+              </select>
+
+              <button
+                onClick={fetchInvestigationData}
+                disabled={loadingInvestigation}
+                className="btn btn-secondary btn-sm"
+                title="Reload investigation logs"
+              >
+                <RefreshCw size={14} className={loadingInvestigation ? 'animate-pulse-glow' : ''} />
+              </button>
+            </div>
+          </div>
+
+          {/* Investigation Table */}
+          <div className="table-wrapper">
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Session & Course</th>
+                    <th>Student Attendee</th>
+                    <th>Recorded (UTC)</th>
+                    <th>Status</th>
+                    <th>Method</th>
+                    <th>Proximity (RSSI)</th>
+                    <th>Bound Device</th>
+                    <th style={{ textAlign: 'right' }}>Forensic Proof</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {investigationRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ padding: '3rem 1rem' }}>
+                        <EmptyState
+                          title="No attendance events found"
+                          description="No attendance records match your search query."
+                          icon={ShieldAlert}
+                        />
+                      </td>
+                    </tr>
+                  ) : (
+                    investigationRecords.map((item) => (
+                      <tr key={item.id}>
+                        <td>
+                          <div style={{ fontWeight: 600, color: 'var(--slate-900)' }}>
+                            {item.session_title}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--primary-600)', fontFamily: 'var(--font-mono)' }}>
+                            {item.course_code}
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600, color: 'var(--slate-900)' }}>
+                            {item.student_name}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--slate-500)', fontFamily: 'var(--font-mono)' }}>
+                            {item.student_id_number}
+                          </div>
+                        </td>
+                        <td style={{ color: 'var(--slate-500)', fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>
+                          {new Date(item.recorded_at).toLocaleString()}
+                        </td>
+                        <td>
+                          <StatusPill status={item.status} size="sm" />
+                        </td>
+                        <td>
+                          <span style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            color: item.verification_method === 'BLE' ? 'var(--primary-700)' : 'var(--amber-700)'
+                          }}>
+                            {item.verification_method}
+                          </span>
+                          {item.manual_override && (
+                            <div style={{ fontSize: '0.6875rem', color: 'var(--amber-800)' }}>
+                              Override
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--slate-600)' }}>
+                            {item.rssi !== null && item.rssi !== undefined ? `${item.rssi} dBm` : '—'}
+                          </span>
+                        </td>
+                        <td>
+                          {item.device_model ? (
+                            <div>
+                              <div style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--slate-800)' }}>
+                                {item.device_model}
+                              </div>
+                              <div style={{ fontSize: '0.6875rem', fontFamily: 'var(--font-mono)', color: 'var(--slate-400)' }}>
+                                {item.device_identifier ? item.device_identifier.substring(0, 12) + '...' : ''}
+                              </div>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)' }}>None</span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <button
-                            onClick={() => setUserToggleTarget(u)}
-                            className={`btn btn-sm ${u.is_active ? 'btn-secondary' : 'btn-primary'}`}
+                            onClick={() => setSelectedProof(item)}
+                            className="btn btn-secondary btn-sm"
+                            title="Inspect hardware cryptographic proof"
                           >
-                            {u.is_active ? 'Suspend' : 'Activate'}
+                            <Key size={13} />
+                            <span>Inspect Proof</span>
                           </button>
                         </td>
                       </tr>
@@ -654,7 +928,7 @@ export const AdminPortal: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 3: AUDIT TRAIL */}
+      {/* TAB 4: AUDIT TRAIL */}
       {activeTab === 'audit' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           
@@ -860,6 +1134,125 @@ export const AdminPortal: React.FC = () => {
         onConfirm={handleConfirmToggleUser}
         onCancel={() => setUserToggleTarget(null)}
       />
+
+      {/* CONFIRM MODAL: ROLE CHANGE */}
+      <ConfirmModal
+        isOpen={roleChangeTarget !== null}
+        title="Change User Authorization Role"
+        variant="primary"
+        isLoading={changingRole}
+        confirmLabel={`Yes, Change Role to ${roleChangeTarget?.newRole.toUpperCase()}`}
+        message={
+          roleChangeTarget && (
+            <div>
+              <p style={{ marginBottom: '0.75rem' }}>
+                Are you sure you want to change the role of <strong>{roleChangeTarget.user.full_name}</strong> (<code>{roleChangeTarget.user.email}</code>) from <strong>{roleChangeTarget.user.role.toUpperCase()}</strong> to <strong>{roleChangeTarget.newRole.toUpperCase()}</strong>?
+              </p>
+              <div style={{ padding: '0.75rem', background: 'var(--slate-50)', border: '1px solid var(--slate-200)', borderRadius: 'var(--radius-md)', fontSize: '0.8125rem', color: 'var(--slate-700)' }}>
+                This user will gain or lose permissions immediately across all API endpoints and client portals.
+              </div>
+            </div>
+          )
+        }
+        onConfirm={handleConfirmRoleChange}
+        onCancel={() => setRoleChangeTarget(null)}
+      />
+
+      {/* MODAL: CRYPTOGRAPHIC PROOF INSPECTOR */}
+      {selectedProof && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="proof-modal-title">
+          <div className="modal-content" style={{ maxWidth: '640px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Fingerprint size={22} color="var(--primary-600)" />
+                <h2 id="proof-modal-title" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--slate-900)' }}>
+                  Cryptographic Verification Proof
+                </h2>
+              </div>
+              <button
+                onClick={() => setSelectedProof(null)}
+                className="btn btn-secondary btn-sm"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.8125rem', color: 'var(--slate-500)', marginBottom: '1.25rem' }}>
+              Attendance event #{selectedProof.id} for <strong>{selectedProof.student_name}</strong> in {selectedProof.session_title} ({selectedProof.course_code}).
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', background: 'var(--slate-50)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--slate-200)', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem' }}>
+                <span style={{ color: 'var(--slate-500)' }}>Verification Method:</span>
+                <strong>{selectedProof.verification_method}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem' }}>
+                <span style={{ color: 'var(--slate-500)' }}>Signal Strength (RSSI):</span>
+                <span style={{ fontFamily: 'var(--font-mono)' }}>{selectedProof.rssi ?? 'N/A'} dBm</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem' }}>
+                <span style={{ color: 'var(--slate-500)' }}>Device Model:</span>
+                <span>{selectedProof.device_model || 'Unregistered'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem' }}>
+                <span style={{ color: 'var(--slate-500)' }}>Device Identifier:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>{selectedProof.device_identifier || 'N/A'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem' }}>
+                <span style={{ color: 'var(--slate-500)' }}>Challenge Nonce:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>{selectedProof.nonce || 'N/A'}</span>
+              </div>
+              
+              <div>
+                <span style={{ color: 'var(--slate-500)', fontSize: '0.8125rem' }}>Hardware Public Key (P-256 / Ed25519 SPKI):</span>
+                <pre style={{
+                  marginTop: '0.375rem',
+                  padding: '0.625rem',
+                  background: '#ffffff',
+                  border: '1px solid var(--slate-200)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.6875rem',
+                  fontFamily: 'var(--font-mono)',
+                  color: 'var(--emerald-700)',
+                  overflowX: 'auto',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all'
+                }}>
+                  {selectedProof.device_public_key || 'No hardware public key bound (Manual Override)'}
+                </pre>
+              </div>
+
+              {selectedProof.manual_override && (
+                <div style={{ padding: '0.5rem 0.75rem', background: 'var(--amber-50)', border: '1px solid var(--amber-200)', borderRadius: 'var(--radius-sm)', color: 'var(--amber-900)', fontSize: '0.75rem' }}>
+                  <strong>Manual Override Reason:</strong> {selectedProof.override_reason || 'Administrative correction'}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {selectedProof.device_id ? (
+                <button
+                  onClick={() => handleConfirmRevokeDevice(selectedProof.device_id!, selectedProof.student_name)}
+                  disabled={revokingDeviceId === selectedProof.device_id}
+                  className="btn btn-danger btn-sm"
+                  title="Revoke device hardware credentials"
+                >
+                  <ShieldOff size={14} />
+                  <span>{revokingDeviceId === selectedProof.device_id ? 'Revoking...' : 'Revoke This Device'}</span>
+                </button>
+              ) : <div />}
+
+              <button
+                type="button"
+                onClick={() => setSelectedProof(null)}
+                className="btn btn-secondary"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

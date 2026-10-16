@@ -89,3 +89,48 @@ def test_get_current_user_me(client, student_headers):
     data = response.json()
     assert data["email"] == "test_student@proxyproof.edu"
     assert data["student_profile"]["student_id_number"] == "STU-TEST-001"
+
+
+def test_update_profile_name_and_department(client, student_headers):
+    res = client.put("/api/v1/auth/profile", headers=student_headers, json={
+        "full_name": "Alice Updated",
+        "department": "Robotics & AI"
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["full_name"] == "Alice Updated"
+    assert data["student_profile"]["department"] == "Robotics & AI"
+
+
+def test_update_password_wrong_current(client, student_headers):
+    res = client.put("/api/v1/auth/profile", headers=student_headers, json={
+        "current_password": "WrongCurrentPassword123!",
+        "new_password": "NewSecretPass123!"
+    })
+    assert res.status_code == 400
+    assert "Current password is incorrect" in res.json()["detail"]
+
+
+def test_update_password_success_and_login(client, student_headers, student_fixture):
+    # Update password successfully
+    res = client.put("/api/v1/auth/profile", headers=student_headers, json={
+        "current_password": "StudentPass123!",
+        "new_password": "BrandNewStudentPassword456!"
+    })
+    assert res.status_code == 200
+
+    # Old password no longer works
+    fail_res = client.post("/api/v1/auth/login", json={
+        "email": student_fixture["user"].email,
+        "password": "StudentPass123!"
+    })
+    assert fail_res.status_code == 401
+
+    # New password logs in successfully
+    success_res = client.post("/api/v1/auth/login", json={
+        "email": student_fixture["user"].email,
+        "password": "BrandNewStudentPassword456!"
+    })
+    assert success_res.status_code == 200
+    assert "access_token" in success_res.json()
+
