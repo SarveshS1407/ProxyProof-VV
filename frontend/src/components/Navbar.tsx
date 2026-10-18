@@ -90,9 +90,9 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab }) => 
           </nav>
 
           {/* User Profile & Logout */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: '#0f172a', lineHeight: 1.2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', maxWidth: '120px' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: '#0f172a', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
                 {user.full_name}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.15rem' }}>

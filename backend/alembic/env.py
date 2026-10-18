@@ -8,7 +8,7 @@ from alembic import context
 # Ensure backend directory is in python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.database import Base
+from app.database import Base, database_url
 import app.models  # Ensures all models are imported and registered
 from app.config import settings
 
@@ -17,7 +17,7 @@ from app.config import settings
 config = context.config
 
 # Set sqlalchemy.url from our application settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", database_url)
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:
@@ -46,7 +46,7 @@ def run_migrations_online() -> None:
     configuration = config.get_section(config.config_ini_section)
     if configuration is None:
         configuration = {}
-    configuration["sqlalchemy.url"] = settings.DATABASE_URL
+    configuration["sqlalchemy.url"] = database_url
 
     connectable = engine_from_config(
         configuration,
