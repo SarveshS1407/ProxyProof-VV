@@ -2,6 +2,8 @@
 
 ### Mobile-First Cryptographic Bluetooth Attendance & Multi-Factor Presence Verification System
 
+[![Live Demo](https://img.shields.io/badge/Live%20Production%20URL-proxyproof--neon.vercel.app-6366F1?style=for-the-badge&logo=vercel&logoColor=white)](https://proxyproof-neon.vercel.app)
+
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![React 18](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev/)

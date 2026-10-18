@@ -543,3 +543,96 @@ a:focus-visible {
 .animate-pulse-glow {
   animation: pulseGlow 2s infinite ease-in-out;
 }
+
+/* ==========================================================================
+   Responsive Grid & Mobile Ergonomics System
+   ========================================================================== */
+
+/* Main 2-column dashboard layout (collapses gracefully on tablets/phones) */
+.responsive-grid-main {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 991px) {
+  .responsive-grid-main {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+}
+
+/* 2 equal halves layout (collapses to single column on mobile/small tablets) */
+.responsive-grid-halves {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 840px) {
+  .responsive-grid-halves {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+}
+
+/* 2-column form row (collapses on compact mobile screens < 600px) */
+.responsive-grid-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 600px) {
+  .responsive-grid-form {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}
+
+/* 3-column button / option group (stacks on small mobile screens < 480px) */
+.responsive-grid-triples {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+@media (max-width: 480px) {
+  .responsive-grid-triples {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+}
+
+/* Fluid responsive cards grid with container safety */
+.responsive-grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 1rem;
+}
+
+/* Mobile container & touch target optimizations */
+@media (max-width: 480px) {
+  .container {
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+  }
+  .card {
+    padding: 1.125rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .btn {
+    min-height: 44px;
+  }
+  .input-field {
+    min-height: 44px;
+    font-size: 1rem; /* Prevents unwanted iOS Safari viewport auto-zoom */
+  }
+  .mobile-nav-btn {
+    min-height: 44px;
+  }
+}

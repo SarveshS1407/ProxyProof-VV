@@ -387,7 +387,7 @@ export const OrganiserDashboard: React.FC = () => {
       </div>
 
       {/* Main Layout Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 360px) 1fr', gap: '1.5rem', alignItems: 'start' }}>
+      <div className="responsive-grid-main">
         
         {/* Left Column: Sessions List & Active Session Broadcaster */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -836,7 +836,7 @@ export const OrganiserDashboard: React.FC = () => {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="responsive-grid-form" style={{ gap: '0.75rem' }}>
                 <div>
                   <label className="input-label">Location / Room</label>
                   <input

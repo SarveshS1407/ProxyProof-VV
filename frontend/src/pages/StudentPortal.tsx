@@ -421,7 +421,7 @@ export const StudentPortal: React.FC = () => {
 
       {/* TAB 1: LIVE BLE CHECK-IN */}
       {activeTab === 'checkin' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1fr) minmax(320px, 1fr)', gap: '1.5rem', alignItems: 'start' }}>
+        <div className="responsive-grid-halves">
           
           {/* Active Session Card */}
           <div className="card">
@@ -660,7 +660,7 @@ export const StudentPortal: React.FC = () => {
       {activeTab === 'courses' && (
         <div>
           {/* Summary Metric Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
             <div className="card" style={{ padding: '1.25rem' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
                 Overall Attendance
@@ -711,7 +711,7 @@ export const StudentPortal: React.FC = () => {
                 description="You have not been enrolled in any courses yet. Ask your instructor to enroll your student ID."
               />
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
+              <div className="responsive-grid-cards">
                 {report?.course_percentages.map((c) => {
                   const pct = c.attendance_percentage;
                   const isEligible = pct >= 75;
@@ -980,7 +980,7 @@ export const StudentPortal: React.FC = () => {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="responsive-grid-form">
                 <div>
                   <label className="input-label">Academic Department</label>
                   <input
@@ -1041,7 +1041,7 @@ export const StudentPortal: React.FC = () => {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="responsive-grid-form">
                 <div>
                   <label className="input-label">New Password</label>
                   <input

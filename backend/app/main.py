@@ -204,6 +204,7 @@ app.add_middleware(RateLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else ["*"],
+    allow_origin_regex=r"^https:\/\/.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -218,7 +219,6 @@ app.include_router(attendance_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
 
 
-@app.get("/", tags=["Health"])
 @app.get("/health", tags=["Health"])
 @app.get("/api/v1/health", tags=["Health"])
 def health_check(db: Session = Depends(get_db)):
@@ -314,3 +314,46 @@ async def session_websocket_endpoint(
     except Exception as e:
         logger.warning(f"WebSocket connection error: {e}")
         manager.disconnect(session_id, websocket)
+
+
+# ==============================================================================
+# Frontend Single-Page Application (SPA) & Static Asset Serving
+# ==============================================================================
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+# Search standard bundle locations for the built Vite production output
+candidate_dist_dirs = [
+    Path(__file__).resolve().parent.parent.parent / "frontend" / "dist",
+    Path(__file__).resolve().parent.parent / "frontend" / "dist",
+    Path("/var/task/frontend/dist"),
+]
+dist_dir = next((p for p in candidate_dist_dirs if p.exists() and (p / "index.html").exists()), None)
+
+if dist_dir:
+    assets_dir = dist_dir / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+    @app.get("/", include_in_schema=False)
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_frontend_spa(full_path: str = ""):
+        # Never intercept API endpoints, health checks, or OpenAPI documentation
+        if full_path.startswith("api/") or full_path in ("health", "docs", "redoc", "openapi.json"):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+
+        file_path = dist_dir / full_path
+        if full_path and file_path.is_file():
+            return FileResponse(file_path)
+
+        index_file = dist_dir / "index.html"
+        if index_file.is_file():
+            return FileResponse(index_file)
+
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Frontend application build not found")
+else:
+    # Fallback root endpoint when frontend dist is not built
+    @app.get("/", tags=["Health"], include_in_schema=False)
+    def root_health_fallback(db: Session = Depends(get_db)):
+        return health_check(db)

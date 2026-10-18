@@ -108,7 +108,7 @@ export const Register: React.FC<RegisterProps> = ({ onSwitchToLogin }) => {
             <label className="input-label" style={{ marginBottom: '0.5rem' }}>
               Select Account Role
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+            <div className="responsive-grid-triples">
               <button
                 type="button"
                 onClick={() => setRole('student')}
@@ -285,7 +285,7 @@ export const Register: React.FC<RegisterProps> = ({ onSwitchToLogin }) => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="responsive-grid-form" style={{ gap: '0.75rem' }}>
                   <div>
                     <label htmlFor="reg-dept" className="input-label">
                       Department

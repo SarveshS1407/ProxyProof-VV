@@ -162,7 +162,7 @@ export const Login: React.FC<LoginProps> = ({ onSwitchToRegister }) => {
             <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--slate-500)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem', textAlign: 'center' }}>
               One-Click Role Demonstration
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+            <div className="responsive-grid-triples">
               <button
                 type="button"
                 onClick={() => handleQuickDemo('student@university.edu', 'StudentPass123!')}

@@ -101,6 +101,11 @@ class Settings(BaseSettings):
             if self.AUTO_CREATE_TABLES is None:
                 self.AUTO_CREATE_TABLES = True
 
+        # In serverless environments (Vercel / Lambda) where local directory is read-only:
+        if (os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")) and self.DATABASE_URL.startswith("sqlite"):
+            if not self.DATABASE_URL.startswith("sqlite:////tmp"):
+                self.DATABASE_URL = "sqlite:////tmp/proxyproof.db"
+
         return self
 
 
