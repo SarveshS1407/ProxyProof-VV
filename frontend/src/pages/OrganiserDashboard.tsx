@@ -55,7 +55,7 @@ export const OrganiserDashboard: React.FC = () => {
   // WebSocket reference
   const wsRef = useRef<WebSocket | null>(null);
 
-  const fetchInitialData = async () => {
+  const fetchInitialData = async (preferredSessionId?: number) => {
     try {
       setLoading(true);
       const [c, allSessions] = await Promise.all([
@@ -70,15 +70,19 @@ export const OrganiserDashboard: React.FC = () => {
 
       setSessions(allSessions);
 
-      // State recovery: restore previous session or first active session
-      const savedSessionId = localStorage.getItem('proxyproof_selected_session_id');
+      // State recovery: restore preferred session, previous session, or first active session
+      const savedSessionId = preferredSessionId || Number(localStorage.getItem('proxyproof_selected_session_id'));
       const targetSession =
-        (savedSessionId && allSessions.find((s) => s.id === Number(savedSessionId))) ||
+        (savedSessionId && allSessions.find((s) => s.id === savedSessionId)) ||
         allSessions.find((s) => s.is_active && !s.is_closed) ||
         (allSessions.length > 0 ? allSessions[0] : null);
 
       if (targetSession) {
-        selectSession(targetSession);
+        await selectSession(targetSession);
+      } else {
+        setActiveSession(null);
+        setAttendanceRecords([]);
+        setTokenInfo(null);
       }
     } catch (err: any) {
       showToast('error', err.message || 'Error loading organiser console');
@@ -244,8 +248,7 @@ export const OrganiserDashboard: React.FC = () => {
       });
       setShowCreateModal(false);
       setNewTitle('');
-      await fetchInitialData();
-      selectSession(created);
+      await fetchInitialData(created.id);
       showToast('success', `Session "${created.title}" created!`);
     } catch (err: any) {
       showToast('error', `Error creating session: ${err.message}`);
@@ -255,12 +258,14 @@ export const OrganiserDashboard: React.FC = () => {
   const handleStartSession = async () => {
     if (!activeSession) return;
     try {
-      await api.startSession(activeSession.id);
+      const startRes = await api.startSession(activeSession.id);
+      if (startRes && startRes.token_info) {
+        setTokenInfo(startRes.token_info);
+      }
       const updated = await api.getSessionDetail(activeSession.id);
       setActiveSession(updated);
-      const token = await api.getCurrentToken(activeSession.id);
-      setTokenInfo(token);
-      showToast('success', 'BLE attendance broadcast started!');
+      await fetchInitialData(activeSession.id);
+      showToast('success', `BLE attendance broadcast started for "${activeSession.title}"!`);
     } catch (err: any) {
       showToast('error', `Error starting session: ${err.message}`);
     }

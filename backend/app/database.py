@@ -4,9 +4,11 @@ from app.config import settings
 
 database_url = settings.DATABASE_URL
 
-# SQLAlchemy 2.0+ requires 'postgresql://' instead of legacy 'postgres://'
+# Normalize PostgreSQL URL scheme to explicitly use psycopg2 driver
 if database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
+    database_url = database_url.replace("postgres://", "postgresql+psycopg2://", 1)
+elif database_url.startswith("postgresql://") and not database_url.startswith("postgresql+"):
+    database_url = database_url.replace("postgresql://", "postgresql+psycopg2://", 1)
 
 connect_args = {}
 engine_kwargs = {"echo": False}
