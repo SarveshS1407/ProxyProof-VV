@@ -56,9 +56,16 @@ export const StatusPill: React.FC<StatusPillProps> = ({ status, size = 'md' }) =
       icon = <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#059669', display: 'inline-block' }} />;
       label = 'Live Beacon';
       break;
+    case 'SCHEDULED':
+      badgeClass = 'badge-pending';
+      icon = <Clock size={12} />;
+      label = 'Scheduled';
+      break;
+    case 'CONCLUDED':
     case 'CLOSED':
       badgeClass = 'badge-revoked';
-      label = 'Closed';
+      icon = <CheckCircle2 size={12} />;
+      label = norm === 'CONCLUDED' ? 'Concluded' : 'Closed';
       break;
     case 'ACTIVE':
       badgeClass = 'badge-approved';

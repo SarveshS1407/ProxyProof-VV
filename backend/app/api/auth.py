@@ -21,6 +21,13 @@ def register(user_in: UserRegister, db: Session = Depends(get_db)):
             detail="An account with this email already exists"
         )
 
+    # Disallow public administrator self-registration
+    if user_in.role == UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Public administrator self-registration is disabled. Administrator accounts must be created by an existing administrator."
+        )
+
     # Validate student requirements
     if user_in.role == UserRole.STUDENT:
         if not user_in.student_id_number or not user_in.student_id_number.strip():

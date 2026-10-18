@@ -106,7 +106,19 @@ def list_sessions(
 
     sessions = query.order_by(AttendanceSession.created_at.desc()).all()
     results = []
+    now = datetime.now(timezone.utc)
+    updated = False
     for s in sessions:
+        if s.is_active and not s.is_closed and s.end_time:
+            end_t = s.end_time
+            if end_t.tzinfo is None:
+                end_t = end_t.replace(tzinfo=timezone.utc)
+            if now > end_t:
+                s.is_active = False
+                s.is_closed = True
+                db.add(s)
+                updated = True
+
         enrolled = db.query(CourseEnrollment).filter(
             CourseEnrollment.course_id == s.course_id,
             CourseEnrollment.is_active == True
@@ -133,6 +145,8 @@ def list_sessions(
             attendance_count=attended,
             enrolled_count=enrolled
         ))
+    if updated:
+        db.commit()
     return results
 
 
@@ -146,8 +160,21 @@ def list_active_sessions(
         AttendanceSession.is_closed == False
     ).order_by(AttendanceSession.created_at.desc()).all()
 
+    now = datetime.now(timezone.utc)
     results = []
+    updated = False
     for s in sessions:
+        if s.end_time:
+            end_t = s.end_time
+            if end_t.tzinfo is None:
+                end_t = end_t.replace(tzinfo=timezone.utc)
+            if now > end_t:
+                s.is_active = False
+                s.is_closed = True
+                db.add(s)
+                updated = True
+                continue
+
         enrolled = db.query(CourseEnrollment).filter(
             CourseEnrollment.course_id == s.course_id,
             CourseEnrollment.is_active == True
@@ -174,6 +201,8 @@ def list_active_sessions(
             attendance_count=attended,
             enrolled_count=enrolled
         ))
+    if updated:
+        db.commit()
     return results
 
 
@@ -398,3 +427,33 @@ def get_session_status(
         attendance_count=attended,
         enrolled_count=enrolled
     )
+
+
+@router.delete("/{session_id}")
+def delete_session(
+    session_id: int,
+    current_user: User = Depends(get_current_organiser),
+    db: Session = Depends(get_db)
+):
+    s = db.query(AttendanceSession).filter(AttendanceSession.id == session_id).first()
+    if not s:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    if current_user.role != UserRole.ADMIN and s.organiser_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to delete another organiser's session"
+        )
+
+    title = s.title
+    db.delete(s)
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="SESSION_DELETED",
+        entity_type="AttendanceSession",
+        entity_id=session_id,
+        details=f"Session '{title}' (ID {session_id}) deleted by {current_user.email}"
+    )
+    db.add(audit)
+    db.commit()
+    return {"message": f"Session '{title}' deleted successfully", "session_id": session_id}
+

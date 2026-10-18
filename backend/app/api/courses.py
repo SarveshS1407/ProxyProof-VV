@@ -197,3 +197,34 @@ def list_enrolled_students(
             "enrolled_at": e.enrolled_at
         })
     return students
+
+
+@router.delete("/{course_id}")
+def delete_course(
+    course_id: int,
+    current_user: User = Depends(get_current_organiser),
+    db: Session = Depends(get_db)
+):
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    if current_user.role != UserRole.ADMIN and course.organiser_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to delete another organiser's course"
+        )
+
+    code = course.code
+    db.delete(course)
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="COURSE_DELETED",
+        entity_type="Course",
+        entity_id=course_id,
+        details=f"Course {code} deleted by {current_user.email}"
+    )
+    db.add(audit)
+    db.commit()
+    return {"message": f"Course '{code}' deleted successfully", "course_id": course_id}
+

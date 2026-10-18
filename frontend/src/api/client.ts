@@ -256,6 +256,22 @@ export const api = {
     return handleResponse(res);
   },
 
+  async deleteSession(sessionId: number): Promise<{ message: string; session_id: number }> {
+    const res = await fetch(`${API_BASE_URL}/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: { ...getAuthHeader() },
+    });
+    return handleResponse(res);
+  },
+
+  async deleteCourse(courseId: number): Promise<{ message: string; course_id: number }> {
+    const res = await fetch(`${API_BASE_URL}/courses/${courseId}`, {
+      method: 'DELETE',
+      headers: { ...getAuthHeader() },
+    });
+    return handleResponse(res);
+  },
+
   // Attendance
   async submitAttendance(data: {
     session_id: number;

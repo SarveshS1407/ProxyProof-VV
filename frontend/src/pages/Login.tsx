@@ -176,10 +176,10 @@ export const Login: React.FC<LoginProps> = ({ onSwitchToRegister }) => {
 
               <button
                 type="button"
-                onClick={() => handleQuickDemo('prof@university.edu', 'ProfPass123!')}
+                onClick={() => handleQuickDemo('sarvesh@university.edu', 'SarveshPass123!')}
                 className="btn btn-secondary"
                 style={{ flexDirection: 'column', padding: '0.625rem 0.25rem', fontSize: '0.75rem', gap: '0.25rem' }}
-                title="Organiser login demo"
+                title="Organiser login demo (Sarvesh S)"
               >
                 <UserCheck size={16} color="var(--emerald-600)" />
                 <span style={{ fontWeight: 600 }}>Organiser</span>
