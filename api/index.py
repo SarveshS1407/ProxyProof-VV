@@ -17,6 +17,8 @@ async def app(scope, receive, send):
         matched_path = headers.get(b"x-matched-path")
         if matched_path:
             original_path = matched_path.decode("utf-8")
+            if "?" in original_path:
+                original_path = original_path.split("?", 1)[0]
             if scope.get("path") in ("/api/index.py", "/index.html") or scope.get("path", "").endswith(".py"):
                 scope["path"] = original_path
                 scope["raw_path"] = original_path.encode("utf-8")
