@@ -219,8 +219,8 @@ app.include_router(attendance_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
 
 
-@app.get("/health", tags=["Health"])
-@app.get("/api/v1/health", tags=["Health"])
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["Health"])
+@app.api_route("/api/v1/health", methods=["GET", "HEAD"], tags=["Health"])
 def health_check(db: Session = Depends(get_db)):
     """Verifies actual database connectivity and returns system operational status."""
     try:
@@ -262,10 +262,16 @@ async def session_websocket_endpoint(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or expired authentication token")
         return
 
-    user_email = payload.get("sub")
+    sub = payload.get("sub")
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.email == user_email).first()
+        user = None
+        if sub is not None:
+            sub_str = str(sub).strip()
+            if sub_str.isdigit():
+                user = db.query(User).filter(User.id == int(sub_str)).first()
+            if not user:
+                user = db.query(User).filter(User.email == sub_str.lower()).first()
         if not user or not user.is_active:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="User account inactive or not found")
             return
@@ -336,8 +342,8 @@ if dist_dir:
     if assets_dir.exists():
         app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
-    @app.get("/", include_in_schema=False)
-    @app.get("/{full_path:path}", include_in_schema=False)
+    @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
+    @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
     async def serve_frontend_spa(full_path: str = ""):
         # Never intercept API endpoints, health checks, or OpenAPI documentation
         if full_path.startswith("api/") or full_path in ("health", "docs", "redoc", "openapi.json"):
@@ -354,6 +360,6 @@ if dist_dir:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Frontend application build not found")
 else:
     # Fallback root endpoint when frontend dist is not built
-    @app.get("/", tags=["Health"], include_in_schema=False)
+    @app.api_route("/", methods=["GET", "HEAD"], tags=["Health"], include_in_schema=False)
     def root_health_fallback(db: Session = Depends(get_db)):
         return health_check(db)
